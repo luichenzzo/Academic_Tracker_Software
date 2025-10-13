@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.Font?>
+
+<BorderPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" 
+            fx:controller="com.academictracker.controller.TeacherDashboardController">
+    
+    <top>
+        <VBox>
+            <MenuBar>
+                <Menu text="File">
+                    <MenuItem text="Refresh"/>
+                    <SeparatorMenuItem/>
+                    <MenuItem text="Logout"/>
+                </Menu>
+            </MenuBar>
+            
+            <HBox alignment="CENTER_LEFT" spacing="20" style="-fx-background-color: #16a085; -fx-padding: 15;">
+                <Label fx:id="welcomeLabel" text="Welcome, Teacher" textFill="WHITE">
+                    <font>
+                        <Font name="System Bold" size="18"/>
+                    </font>
+                </Label>
+            </HBox>
+        </VBox>
+    </top>
+    
+    <center>
+        <TabPane tabClosingPolicy="UNAVAILABLE">
+            <Tab text="My Courses">
+                <VBox spacing="10" style="-fx-padding: 15;">
+                    <Label text="Your assigned courses will be displayed here" style="-fx-font-size: 16px;"/>
+                </VBox>
+            </Tab>
+            
+            <Tab text="Students">
+                <VBox spacing="10" style="-fx-padding: 15;">
+                    <Label text="Students enrolled in your courses" style="-fx-font-size: 16px;"/>
+                </VBox>
+            </Tab>
+            
+            <Tab text="Grades">
+                <VBox spacing="10" style="-fx-padding: 15;">
+                    <Label text="Manage student grades" style="-fx-font-size: 16px;"/>
+                </VBox>
+            </Tab>
+        </TabPane>
+    </center>
+    
+    <bottom>
+        <HBox alignment="CENTER_LEFT" spacing="20" style="-fx-background-color: #ecf0f1; -fx-padding: 10;">
+            <Label text="Academic Tracker Software v1.0.0"/>
+        </HBox>
+    </bottom>
+</BorderPane>
