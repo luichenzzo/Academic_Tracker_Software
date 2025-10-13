@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.Font?>
+
+<BorderPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" 
+            fx:controller="com.academictracker.controller.AdminDashboardController">
+    
+    <!-- Top Menu Bar -->
+    <top>
+        <VBox>
+            <MenuBar>
+                <Menu text="File">
+                    <MenuItem text="Refresh" onAction="#handleRefresh"/>
+                    <SeparatorMenuItem/>
+                    <MenuItem text="Logout" onAction="#handleLogout"/>
+                </Menu>
+                <Menu text="Help">
+                    <MenuItem text="About"/>
+                </Menu>
+            </MenuBar>
+            
+            <HBox alignment="CENTER_LEFT" spacing="20" style="-fx-background-color: #2c3e50; -fx-padding: 15;">
+                <Label fx:id="welcomeLabel" text="Welcome, Admin" textFill="WHITE">
+                    <font>
+                        <Font name="System Bold" size="18"/>
+                    </font>
+                </Label>
+            </HBox>
+        </VBox>
+    </top>
+    
+    <!-- Center Content -->
+    <center>
+        <TabPane fx:id="mainTabPane" tabClosingPolicy="UNAVAILABLE">
+            
+            <!-- Students Tab -->
+            <Tab text="Students">
+                <VBox spacing="10" style="-fx-padding: 15;">
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Button text="Add Student" styleClass="primary-button"/>
+                        <Button text="Edit Student" styleClass="secondary-button"/>
+                        <Button text="Delete Student" styleClass="danger-button"/>
+                        <Button text="View Details"/>
+                    </HBox>
+                    
+                    <TableView fx:id="studentTable" VBox.vgrow="ALWAYS">
+                        <columns>
+                            <TableColumn fx:id="studentIdColumn" text="ID" prefWidth="80"/>
+                            <TableColumn fx:id="studentFirstNameColumn" text="First Name" prefWidth="150"/>
+                            <TableColumn fx:id="studentLastNameColumn" text="Last Name" prefWidth="150"/>
+                            <TableColumn fx:id="studentPhoneColumn" text="Phone" prefWidth="150"/>
+                        </columns>
+                    </TableView>
+                </VBox>
+            </Tab>
+            
+            <!-- Teachers Tab -->
+            <Tab text="Teachers">
+                <VBox spacing="10" style="-fx-padding: 15;">
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Button text="Add Teacher" styleClass="primary-button"/>
+                        <Button text="Edit Teacher" styleClass="secondary-button"/>
+                        <Button text="Delete Teacher" styleClass="danger-button"/>
+                        <Button text="View Details"/>
+                    </HBox>
+                    
+                    <TableView fx:id="teacherTable" VBox.vgrow="ALWAYS">
+                        <columns>
+                            <TableColumn fx:id="teacherIdColumn" text="ID" prefWidth="80"/>
+                            <TableColumn fx:id="teacherFirstNameColumn" text="First Name" prefWidth="150"/>
+                            <TableColumn fx:id="teacherLastNameColumn" text="Last Name" prefWidth="150"/>
+                            <TableColumn fx:id="teacherDepartmentColumn" text="Department" prefWidth="200"/>
+                        </columns>
+                    </TableView>
+                </VBox>
+            </Tab>
+            
+            <!-- Programs Tab -->
+            <Tab text="Programs">
+                <VBox spacing="10" style="-fx-padding: 15;">
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Button text="Add Program" styleClass="primary-button"/>
+                        <Button text="Edit Program" styleClass="secondary-button"/>
+                        <Button text="Delete Program" styleClass="danger-button"/>
+                    </HBox>
+                    
+                    <TableView fx:id="programTable" VBox.vgrow="ALWAYS">
+                        <columns>
+                            <TableColumn fx:id="programIdColumn" text="ID" prefWidth="80"/>
+                            <TableColumn fx:id="programCodeColumn" text="Code" prefWidth="100"/>
+                            <TableColumn fx:id="programNameColumn" text="Name" prefWidth="250"/>
+                            <TableColumn fx:id="programDurationColumn" text="Duration (Years)" prefWidth="120"/>
+                        </columns>
+                    </TableView>
+                </VBox>
+            </Tab>
+            
+            <!-- Courses Tab -->
+            <Tab text="Courses">
+                <VBox spacing="10" style="-fx-padding: 15;">
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Button text="Add Course" styleClass="primary-button"/>
+                        <Button text="Edit Course" styleClass="secondary-button"/>
+                        <Button text="Delete Course" styleClass="danger-button"/>
+                        <Button text="Assign Teacher"/>
+                    </HBox>
+                    
+                    <TableView fx:id="courseTable" VBox.vgrow="ALWAYS">
+                        <columns>
+                            <TableColumn fx:id="courseIdColumn" text="ID" prefWidth="80"/>
+                            <TableColumn fx:id="courseCodeColumn" text="Code" prefWidth="100"/>
+                            <TableColumn fx:id="courseNameColumn" text="Name" prefWidth="250"/>
+                            <TableColumn fx:id="courseCreditsColumn" text="Credits" prefWidth="80"/>
+                        </columns>
+                    </TableView>
+                </VBox>
+            </Tab>
+            
+            <!-- Enrollments Tab -->
+            <Tab text="Enrollments">
+                <VBox spacing="10" style="-fx-padding: 15;">
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Button text="New Enrollment" styleClass="primary-button"/>
+                        <Button text="View Details"/>
+                        <Button text="Update Status"/>
+                    </HBox>
+                    
+                    <Label text="Enrollment management will be displayed here" style="-fx-font-size: 16px; -fx-padding: 20;"/>
+                </VBox>
+            </Tab>
+            
+            <!-- Users Tab -->
+            <Tab text="Users">
+                <VBox spacing="10" style="-fx-padding: 15;">
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Button text="Add User" styleClass="primary-button"/>
+                        <Button text="Edit User" styleClass="secondary-button"/>
+                        <Button text="Delete User" styleClass="danger-button"/>
+                        <Button text="Reset Password"/>
+                    </HBox>
+                    
+                    <Label text="User management will be displayed here" style="-fx-font-size: 16px; -fx-padding: 20;"/>
+                </VBox>
+            </Tab>
+            
+        </TabPane>
+    </center>
+    
+    <!-- Bottom Status Bar -->
+    <bottom>
+        <HBox alignment="CENTER_LEFT" spacing="20" style="-fx-background-color: #ecf0f1; -fx-padding: 10;">
+            <Label text="Academic Tracker Software v1.0.0"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Label text="Database: Connected"/>
+        </HBox>
+    </bottom>
+    
+</BorderPane>

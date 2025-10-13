@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.Font?>
+
+<VBox alignment="CENTER" spacing="20" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" 
+      fx:controller="com.academictracker.controller.LoginController">
+    <padding>
+        <Insets top="40" right="40" bottom="40" left="40"/>
+    </padding>
+    
+    <Label text="Academic Tracker System" styleClass="title-label">
+        <font>
+            <Font name="System Bold" size="24"/>
+        </font>
+    </Label>
+    
+    <Label text="Login" styleClass="subtitle-label">
+        <font>
+            <Font size="18"/>
+        </font>
+    </Label>
+    
+    <VBox spacing="10" VBox.vgrow="ALWAYS">
+        <Label text="Username:"/>
+        <TextField fx:id="usernameField" promptText="Enter username" prefWidth="300"/>
+        
+        <Label text="Password:">
+            <VBox.margin>
+                <Insets top="10"/>
+            </VBox.margin>
+        </Label>
+        <PasswordField fx:id="passwordField" promptText="Enter password" prefWidth="300"/>
+        
+        <Label fx:id="errorLabel" styleClass="error-label" textFill="RED">
+            <VBox.margin>
+                <Insets top="10"/>
+            </VBox.margin>
+        </Label>
+        
+        <Button fx:id="loginButton" text="Login" onAction="#handleLogin" prefWidth="300" 
+                styleClass="primary-button" defaultButton="true">
+            <VBox.margin>
+                <Insets top="20"/>
+            </VBox.margin>
+            <font>
+                <Font size="14"/>
+            </font>
+        </Button>
+    </VBox>
+    
+    <Label text="Default credentials: username='admin', password='admin123'" styleClass="info-label">
+        <font>
+            <Font size="10"/>
+        </font>
+    </Label>
+</VBox>
