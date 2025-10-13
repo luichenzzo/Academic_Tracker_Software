@@ -110,6 +110,6 @@ CREATE INDEX idx_grade_enrollment ON grades(enrollment_id);
 
 -- Insert default admin user (password: admin123)
 INSERT INTO users (username, password_hash, role, email) 
-VALUES ('admin', '$2a$10$ZJQY8LG8Z7M.XqJRXqvxfOX7LKx.xZM3VZ.9jXjqRPZ.xZM3VZ.9jX', 'ADMIN', 'admin@academictracker.com');
+VALUES ('admin', '$2a$10$PbpLJh9Uzk1W0HE0/HfuteX7LkGrXVDTLuOROTzVi9FpdeQVakube', 'ADMIN', 'admin@academictracker.com');
 
 COMMIT;
