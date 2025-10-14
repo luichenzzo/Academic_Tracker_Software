@@ -1,6 +1,7 @@
 package com.academictracker.dao;
 
 import com.academictracker.model.Course;
+import com.academictracker.model.Asignatura;
 import com.academictracker.util.DatabaseConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,38 +12,30 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Data Access Object for Course entity
+ * Data Access Object for Course entity - Bridge to Asignatura table
+ * This maintains compatibility with existing Course model while using new database structure
  */
 public class CourseDAO {
     private static final Logger logger = LoggerFactory.getLogger(CourseDAO.class);
 
     public Course create(Course course) throws SQLException {
-        String sql = "INSERT INTO courses (course_code, course_name, description, credits, program_id, teacher_id, semester, max_students) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-        
+        String sql = "INSERT INTO Asignatura (cod_asignatura, nombre, creditos, horas_semanales, semestre_sugerido, es_trabajo_grado, id_tipo, cod_programa) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql, new String[]{"course_id"})) {
-            
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
             stmt.setString(1, course.getCourseCode());
             stmt.setString(2, course.getCourseName());
-            stmt.setString(3, course.getDescription());
-            stmt.setInt(4, course.getCredits());
-            stmt.setLong(5, course.getProgramId());
-            
-            if (course.getTeacherId() != null) {
-                stmt.setLong(6, course.getTeacherId());
-            } else {
-                stmt.setNull(6, Types.BIGINT);
-            }
-            
-            stmt.setString(7, course.getSemester());
-            stmt.setInt(8, course.getMaxStudents());
-            
-            stmt.executeUpdate();
-            
-            try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
-                if (generatedKeys.next()) {
-                    course.setCourseId(generatedKeys.getLong(1));
-                }
+            stmt.setInt(3, course.getCredits());
+            stmt.setInt(4, course.getCredits() * 2); // Estimate hours per week
+            stmt.setInt(5, course.getSemester() != null ? Integer.parseInt(course.getSemester()) : 1);
+            stmt.setInt(6, 0); // Default not trabajo grado
+            stmt.setLong(7, 1); // Default tipo asignatura (basic)
+            stmt.setLong(8, course.getProgramId());
+
+            int rowsAffected = stmt.executeUpdate();
+            if (rowsAffected == 0) {
+                throw new SQLException("Creating course failed, no rows affected.");
             }
             
             logger.info("Course created: {}", course.getCourseName());
@@ -51,58 +44,58 @@ public class CourseDAO {
     }
 
     public Optional<Course> findById(Long courseId) throws SQLException {
-        String sql = "SELECT * FROM courses WHERE course_id = ?";
-        
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            
-            stmt.setLong(1, courseId);
-            
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    return Optional.of(mapResultSetToCourse(rs));
-                }
-            }
-        }
-        return Optional.empty();
-    }
+        String sql = "SELECT a.*, ta.tipo, p.nombre as programa_nombre " +
+                    "FROM Asignatura a " +
+                    "LEFT JOIN TipoAsignatura ta ON a.id_tipo = ta.id_tipo " +
+                    "LEFT JOIN ProgramaAcademico p ON a.cod_programa = p.cod_programa " +
+                    "WHERE a.cod_asignatura = ?";
 
-    public Optional<Course> findByCode(String courseCode) throws SQLException {
-        String sql = "SELECT * FROM courses WHERE course_code = ?";
-        
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
-            stmt.setString(1, courseCode);
-            
+            stmt.setString(1, courseId.toString());
+
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
                     return Optional.of(mapResultSetToCourse(rs));
                 }
             }
         }
+
         return Optional.empty();
     }
 
     public List<Course> findAll() throws SQLException {
+        String sql = "SELECT a.*, ta.tipo, p.nombre as programa_nombre " +
+                    "FROM Asignatura a " +
+                    "LEFT JOIN TipoAsignatura ta ON a.id_tipo = ta.id_tipo " +
+                    "LEFT JOIN ProgramaAcademico p ON a.cod_programa = p.cod_programa " +
+                    "ORDER BY a.nombre";
+
         List<Course> courses = new ArrayList<>();
-        String sql = "SELECT * FROM courses ORDER BY course_code";
-        
+
         try (Connection conn = DatabaseConnection.getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-            
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
             while (rs.next()) {
                 courses.add(mapResultSetToCourse(rs));
             }
         }
+
         return courses;
     }
 
-    public List<Course> findByProgramId(Long programId) throws SQLException {
+    public List<Course> findByProgram(Long programId) throws SQLException {
+        String sql = "SELECT a.*, ta.tipo, p.nombre as programa_nombre " +
+                    "FROM Asignatura a " +
+                    "LEFT JOIN TipoAsignatura ta ON a.id_tipo = ta.id_tipo " +
+                    "LEFT JOIN ProgramaAcademico p ON a.cod_programa = p.cod_programa " +
+                    "WHERE a.cod_programa = ? " +
+                    "ORDER BY a.semestre_sugerido, a.nombre";
+
         List<Course> courses = new ArrayList<>();
-        String sql = "SELECT * FROM courses WHERE program_id = ? ORDER BY course_code";
-        
+
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
@@ -114,83 +107,69 @@ public class CourseDAO {
                 }
             }
         }
+
         return courses;
     }
 
-    public List<Course> findByTeacherId(Long teacherId) throws SQLException {
-        List<Course> courses = new ArrayList<>();
-        String sql = "SELECT * FROM courses WHERE teacher_id = ? ORDER BY course_code";
-        
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            
-            stmt.setLong(1, teacherId);
-            
-            try (ResultSet rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    courses.add(mapResultSetToCourse(rs));
-                }
-            }
-        }
-        return courses;
-    }
+    public boolean update(Course course) throws SQLException {
+        String sql = "UPDATE Asignatura SET nombre = ?, creditos = ?, horas_semanales = ?, semestre_sugerido = ?, cod_programa = ? WHERE cod_asignatura = ?";
 
-    public void update(Course course) throws SQLException {
-        String sql = "UPDATE courses SET course_code = ?, course_name = ?, description = ?, credits = ?, program_id = ?, teacher_id = ?, semester = ?, max_students = ? WHERE course_id = ?";
-        
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
-            stmt.setString(1, course.getCourseCode());
-            stmt.setString(2, course.getCourseName());
-            stmt.setString(3, course.getDescription());
-            stmt.setInt(4, course.getCredits());
+            stmt.setString(1, course.getCourseName());
+            stmt.setInt(2, course.getCredits());
+            stmt.setInt(3, course.getCredits() * 2); // Estimate hours per week
+            stmt.setInt(4, course.getSemester() != null ? Integer.parseInt(course.getSemester()) : 1);
             stmt.setLong(5, course.getProgramId());
-            
-            if (course.getTeacherId() != null) {
-                stmt.setLong(6, course.getTeacherId());
-            } else {
-                stmt.setNull(6, Types.BIGINT);
+            stmt.setString(6, course.getCourseCode());
+
+            int rowsAffected = stmt.executeUpdate();
+            if (rowsAffected > 0) {
+                logger.info("Course updated successfully: {}", course.getCourseName());
+                return true;
             }
-            
-            stmt.setString(7, course.getSemester());
-            stmt.setInt(8, course.getMaxStudents());
-            stmt.setLong(9, course.getCourseId());
-            
-            stmt.executeUpdate();
-            logger.info("Course updated: {}", course.getCourseId());
         }
+
+        return false;
     }
 
-    public void delete(Long courseId) throws SQLException {
-        String sql = "DELETE FROM courses WHERE course_id = ?";
-        
+    public boolean delete(Long courseId) throws SQLException {
+        String sql = "DELETE FROM Asignatura WHERE cod_asignatura = ?";
+
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
-            stmt.setLong(1, courseId);
-            stmt.executeUpdate();
-            logger.info("Course deleted: {}", courseId);
+            stmt.setString(1, courseId.toString());
+
+            int rowsAffected = stmt.executeUpdate();
+            if (rowsAffected > 0) {
+                logger.info("Course deleted successfully: {}", courseId);
+                return true;
+            }
         }
+
+        return false;
     }
 
     private Course mapResultSetToCourse(ResultSet rs) throws SQLException {
         Course course = new Course();
-        course.setCourseId(rs.getLong("course_id"));
-        course.setCourseCode(rs.getString("course_code"));
-        course.setCourseName(rs.getString("course_name"));
-        course.setDescription(rs.getString("description"));
-        course.setCredits(rs.getInt("credits"));
-        course.setProgramId(rs.getLong("program_id"));
-        
-        long teacherId = rs.getLong("teacher_id");
-        if (!rs.wasNull()) {
-            course.setTeacherId(teacherId);
+
+        // Map from Asignatura to Course for compatibility
+        try {
+            course.setCourseId(Long.parseLong(rs.getString("cod_asignatura")));
+        } catch (NumberFormatException e) {
+            course.setCourseId(rs.getString("cod_asignatura").hashCode() & 0x7fffffffL); // Generate ID from code
         }
         
-        course.setSemester(rs.getString("semester"));
-        course.setMaxStudents(rs.getInt("max_students"));
-        
+        course.setCourseCode(rs.getString("cod_asignatura"));
+        course.setCourseName(rs.getString("nombre"));
+        course.setDescription(rs.getString("tipo")); // Use tipo as description
+        course.setCredits(rs.getInt("creditos"));
+        course.setProgramId(rs.getLong("cod_programa"));
+        course.setSemester(String.valueOf(rs.getInt("semestre_sugerido")));
+        course.setMaxStudents(30); // Default value
+
         return course;
     }
 }

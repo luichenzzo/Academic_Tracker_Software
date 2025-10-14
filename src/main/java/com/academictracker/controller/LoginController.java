@@ -54,14 +54,14 @@ public class LoginController {
         
         if (success) {
             User currentUser = SessionManager.getInstance().getCurrentUser();
-            logger.info("Login successful for user: {} with role: {}", username, currentUser.getRole());
-            
+            logger.info("Login successful for user: {} with role: {}", username, currentUser.getRol());
+
             try {
                 // Load appropriate dashboard based on role
-                String fxmlFile = switch (currentUser.getRole()) {
+                String fxmlFile = switch (currentUser.getRol()) {
                     case ADMIN -> "/fxml/admin-dashboard.fxml";
-                    case TEACHER -> "/fxml/teacher-dashboard.fxml";
-                    case STUDENT -> "/fxml/student-dashboard.fxml";
+                    case DOCENTE -> "/fxml/teacher-dashboard.fxml";
+                    case ESTUDIANTE -> "/fxml/student-dashboard.fxml";
                 };
                 
                 FXMLLoader loader = new FXMLLoader(getClass().getResource(fxmlFile));
@@ -69,7 +69,7 @@ public class LoginController {
                 scene.getStylesheets().add(getClass().getResource("/css/style.css").toExternalForm());
                 
                 Stage stage = (Stage) loginButton.getScene().getWindow();
-                stage.setTitle("Academic Tracker - " + currentUser.getRole() + " Dashboard");
+                stage.setTitle("Academic Tracker - " + currentUser.getRol() + " Dashboard");
                 stage.setScene(scene);
                 stage.setMaximized(true);
                 

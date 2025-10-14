@@ -3,107 +3,257 @@ package com.academictracker.model;
 import java.time.LocalDate;
 
 /**
- * Student entity
+ * Estudiante entity - Represents university students
  */
 public class Student {
-    private Long studentId;
-    private Long userId;
-    private String firstName;
-    private String lastName;
-    private LocalDate dateOfBirth;
-    private String phone;
-    private String address;
-    private LocalDate enrollmentDate;
+    private String codEstudiante;
+    private String numeroDocumento;
+    private String tipoDocumento;
+    private String nombres;
+    private String apellidos;
+    private String correoInstitucional;
+    private String telefono;
+    private LocalDate fechaIngreso;
+    private Integer nivelRiesgo;
+    private Long codPrograma;
+    private Long idSede;
+    private boolean activo;
+
+    // For joins
+    private Program programa;
+    private Sede sede;
 
     // Constructors
     public Student() {
     }
 
-    public Student(Long studentId, Long userId, String firstName, String lastName) {
-        this.studentId = studentId;
-        this.userId = userId;
-        this.firstName = firstName;
-        this.lastName = lastName;
+    public Student(String codEstudiante, String nombres, String apellidos) {
+        this.codEstudiante = codEstudiante;
+        this.nombres = nombres;
+        this.apellidos = apellidos;
+    }
+
+    public Student(String codEstudiante, String numeroDocumento, String tipoDocumento,
+                   String nombres, String apellidos, String correoInstitucional,
+                   LocalDate fechaIngreso, Long codPrograma, Long idSede) {
+        this.codEstudiante = codEstudiante;
+        this.numeroDocumento = numeroDocumento;
+        this.tipoDocumento = tipoDocumento;
+        this.nombres = nombres;
+        this.apellidos = apellidos;
+        this.correoInstitucional = correoInstitucional;
+        this.fechaIngreso = fechaIngreso;
+        this.codPrograma = codPrograma;
+        this.idSede = idSede;
+        this.activo = true;
+        this.nivelRiesgo = 0;
     }
 
     // Getters and Setters
-    public Long getStudentId() {
-        return studentId;
+    public String getCodEstudiante() {
+        return codEstudiante;
     }
 
-    public void setStudentId(Long studentId) {
-        this.studentId = studentId;
+    public void setCodEstudiante(String codEstudiante) {
+        this.codEstudiante = codEstudiante;
     }
 
-    public Long getUserId() {
-        return userId;
+    public String getNumeroDocumento() {
+        return numeroDocumento;
     }
 
-    public void setUserId(Long userId) {
-        this.userId = userId;
+    public void setNumeroDocumento(String numeroDocumento) {
+        this.numeroDocumento = numeroDocumento;
     }
 
+    public String getTipoDocumento() {
+        return tipoDocumento;
+    }
+
+    public void setTipoDocumento(String tipoDocumento) {
+        this.tipoDocumento = tipoDocumento;
+    }
+
+    public String getNombres() {
+        return nombres;
+    }
+
+    public void setNombres(String nombres) {
+        this.nombres = nombres;
+    }
+
+    public String getApellidos() {
+        return apellidos;
+    }
+
+    public void setApellidos(String apellidos) {
+        this.apellidos = apellidos;
+    }
+
+    public String getCorreoInstitucional() {
+        return correoInstitucional;
+    }
+
+    public void setCorreoInstitucional(String correoInstitucional) {
+        this.correoInstitucional = correoInstitucional;
+    }
+
+    public String getTelefono() {
+        return telefono;
+    }
+
+    public void setTelefono(String telefono) {
+        this.telefono = telefono;
+    }
+
+    public LocalDate getFechaIngreso() {
+        return fechaIngreso;
+    }
+
+    public void setFechaIngreso(LocalDate fechaIngreso) {
+        this.fechaIngreso = fechaIngreso;
+    }
+
+    public Integer getNivelRiesgo() {
+        return nivelRiesgo;
+    }
+
+    public void setNivelRiesgo(Integer nivelRiesgo) {
+        this.nivelRiesgo = nivelRiesgo;
+    }
+
+    public Long getCodPrograma() {
+        return codPrograma;
+    }
+
+    public void setCodPrograma(Long codPrograma) {
+        this.codPrograma = codPrograma;
+    }
+
+    public Long getIdSede() {
+        return idSede;
+    }
+
+    public void setIdSede(Long idSede) {
+        this.idSede = idSede;
+    }
+
+    public boolean isActivo() {
+        return activo;
+    }
+
+    public void setActivo(boolean activo) {
+        this.activo = activo;
+    }
+
+    public Program getPrograma() {
+        return programa;
+    }
+
+    public void setPrograma(Program programa) {
+        this.programa = programa;
+        if (programa != null) {
+            this.codPrograma = programa.getCodPrograma();
+        }
+    }
+
+    public Sede getSede() {
+        return sede;
+    }
+
+    public void setSede(Sede sede) {
+        this.sede = sede;
+        if (sede != null) {
+            this.idSede = sede.getIdSede();
+        }
+    }
+
+    // Convenience methods
+    public String getNombreCompleto() {
+        return nombres + " " + apellidos;
+    }
+
+    // Legacy compatibility methods for existing code
     public String getFirstName() {
-        return firstName;
+        return nombres;
     }
 
     public void setFirstName(String firstName) {
-        this.firstName = firstName;
+        this.nombres = firstName;
     }
 
     public String getLastName() {
-        return lastName;
+        return apellidos;
     }
 
     public void setLastName(String lastName) {
-        this.lastName = lastName;
+        this.apellidos = lastName;
     }
 
+    public Long getStudentId() {
+        return codEstudiante != null ? Long.parseLong(codEstudiante) : null;
+    }
+
+    public void setStudentId(Long studentId) {
+        this.codEstudiante = studentId != null ? studentId.toString() : null;
+    }
+
+    // Legacy methods for compatibility
     public LocalDate getDateOfBirth() {
-        return dateOfBirth;
+        return null; // Not used in new structure
     }
 
     public void setDateOfBirth(LocalDate dateOfBirth) {
-        this.dateOfBirth = dateOfBirth;
+        // Not used in new structure
     }
 
     public String getPhone() {
-        return phone;
+        return telefono;
     }
 
     public void setPhone(String phone) {
-        this.phone = phone;
+        this.telefono = phone;
     }
 
     public String getAddress() {
-        return address;
+        return ""; // Not used in new structure
     }
 
     public void setAddress(String address) {
-        this.address = address;
+        // Not used in new structure
     }
 
     public LocalDate getEnrollmentDate() {
-        return enrollmentDate;
+        return fechaIngreso;
     }
 
     public void setEnrollmentDate(LocalDate enrollmentDate) {
-        this.enrollmentDate = enrollmentDate;
+        this.fechaIngreso = enrollmentDate;
     }
 
-    public String getFullName() {
-        return firstName + " " + lastName;
+    public Long getUserId() {
+        return null; // Not used in new structure
+    }
+
+    public void setUserId(Long userId) {
+        // Not used in new structure
     }
 
     @Override
     public String toString() {
-        return "Student{" +
-                "studentId=" + studentId +
-                ", userId=" + userId +
-                ", firstName='" + firstName + '\'' +
-                ", lastName='" + lastName + '\'' +
-                ", phone='" + phone + '\'' +
-                ", enrollmentDate=" + enrollmentDate +
-                '}';
+        return codEstudiante + " - " + getNombreCompleto();
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) return true;
+        if (obj == null || getClass() != obj.getClass()) return false;
+        Student student = (Student) obj;
+        return codEstudiante != null && codEstudiante.equals(student.codEstudiante);
+    }
+
+    @Override
+    public int hashCode() {
+        return codEstudiante != null ? codEstudiante.hashCode() : 0;
     }
 }

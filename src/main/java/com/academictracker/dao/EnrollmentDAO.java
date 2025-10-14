@@ -1,50 +1,66 @@
 package com.academictracker.dao;
 
 import com.academictracker.model.Enrollment;
+import com.academictracker.model.DetalleMatricula;
+import com.academictracker.model.Matricula;
 import com.academictracker.util.DatabaseConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.*;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 /**
- * Data Access Object for Enrollment entity
+ * Data Access Object for Enrollment entity - Bridge to DetalleMatricula/Matricula tables
  */
 public class EnrollmentDAO {
     private static final Logger logger = LoggerFactory.getLogger(EnrollmentDAO.class);
 
     public Enrollment create(Enrollment enrollment) throws SQLException {
-        String sql = "INSERT INTO enrollments (student_id, course_id, enrollment_date, status) VALUES (?, ?, ?, ?)";
-        
+        // First, ensure there's a matricula for this student and period
+        Long matriculaId = getOrCreateMatricula(enrollment.getStudentId(), getCurrentPeriod());
+
+        String sql = "INSERT INTO DetalleMatricula (id_matricula, id_grupo, fecha_inscripcion, estado, numero_intento) VALUES (?, ?, ?, ?, ?)";
+
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql, new String[]{"enrollment_id"})) {
-            
-            stmt.setLong(1, enrollment.getStudentId());
-            stmt.setLong(2, enrollment.getCourseId());
-            stmt.setDate(3, enrollment.getEnrollmentDate() != null ? 
-                Date.valueOf(enrollment.getEnrollmentDate()) : Date.valueOf(java.time.LocalDate.now()));
-            stmt.setString(4, enrollment.getStatus().name());
-            
-            stmt.executeUpdate();
-            
+             PreparedStatement stmt = conn.prepareStatement(sql, new String[]{"id_detalle"})) {
+
+            stmt.setLong(1, matriculaId);
+            stmt.setLong(2, enrollment.getIdGrupo() != null ? enrollment.getIdGrupo() : 1); // Default group
+            stmt.setTimestamp(3, Timestamp.valueOf(LocalDateTime.now()));
+            stmt.setString(4, enrollment.getStatus().getDbValue());
+            stmt.setInt(5, 1); // First attempt
+
+            int rowsAffected = stmt.executeUpdate();
+            if (rowsAffected == 0) {
+                throw new SQLException("Creating enrollment failed, no rows affected.");
+            }
+
             try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
                 if (generatedKeys.next()) {
                     enrollment.setEnrollmentId(generatedKeys.getLong(1));
+                    enrollment.setIdDetalle(generatedKeys.getLong(1));
+                } else {
+                    throw new SQLException("Creating enrollment failed, no ID obtained.");
                 }
             }
             
-            logger.info("Enrollment created: studentId={}, courseId={}", 
-                enrollment.getStudentId(), enrollment.getCourseId());
+            logger.info("Enrollment created for student: {}", enrollment.getStudentId());
             return enrollment;
         }
     }
 
     public Optional<Enrollment> findById(Long enrollmentId) throws SQLException {
-        String sql = "SELECT * FROM enrollments WHERE enrollment_id = ?";
-        
+        String sql = "SELECT dm.*, m.cod_estudiante, m.cod_periodo, g.cod_asignatura, a.nombre as asignatura_nombre " +
+                    "FROM DetalleMatricula dm " +
+                    "JOIN Matricula m ON dm.id_matricula = m.id_matricula " +
+                    "LEFT JOIN Grupo g ON dm.id_grupo = g.id_grupo " +
+                    "LEFT JOIN Asignatura a ON g.cod_asignatura = a.cod_asignatura " +
+                    "WHERE dm.id_detalle = ?";
+
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
@@ -56,121 +72,172 @@ public class EnrollmentDAO {
                 }
             }
         }
+
         return Optional.empty();
     }
 
-    public List<Enrollment> findAll() throws SQLException {
-        List<Enrollment> enrollments = new ArrayList<>();
-        String sql = "SELECT * FROM enrollments ORDER BY enrollment_date DESC";
-        
-        try (Connection conn = DatabaseConnection.getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-            
-            while (rs.next()) {
-                enrollments.add(mapResultSetToEnrollment(rs));
-            }
-        }
-        return enrollments;
-    }
+    public List<Enrollment> findByStudent(String studentId) throws SQLException {
+        String sql = "SELECT dm.*, m.cod_estudiante, m.cod_periodo, g.cod_asignatura, a.nombre as asignatura_nombre " +
+                    "FROM DetalleMatricula dm " +
+                    "JOIN Matricula m ON dm.id_matricula = m.id_matricula " +
+                    "LEFT JOIN Grupo g ON dm.id_grupo = g.id_grupo " +
+                    "LEFT JOIN Asignatura a ON g.cod_asignatura = a.cod_asignatura " +
+                    "WHERE m.cod_estudiante = ? " +
+                    "ORDER BY dm.fecha_inscripcion DESC";
 
-    public List<Enrollment> findByStudentId(Long studentId) throws SQLException {
         List<Enrollment> enrollments = new ArrayList<>();
-        String sql = "SELECT * FROM enrollments WHERE student_id = ? ORDER BY enrollment_date DESC";
-        
+
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
-            stmt.setLong(1, studentId);
-            
+            stmt.setString(1, studentId);
+
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     enrollments.add(mapResultSetToEnrollment(rs));
                 }
             }
         }
+
         return enrollments;
     }
 
-    public List<Enrollment> findByCourseId(Long courseId) throws SQLException {
+    public List<Enrollment> findByCourse(Long courseId) throws SQLException {
+        String sql = "SELECT dm.*, m.cod_estudiante, m.cod_periodo, g.cod_asignatura, a.nombre as asignatura_nombre " +
+                    "FROM DetalleMatricula dm " +
+                    "JOIN Matricula m ON dm.id_matricula = m.id_matricula " +
+                    "JOIN Grupo g ON dm.id_grupo = g.id_grupo " +
+                    "LEFT JOIN Asignatura a ON g.cod_asignatura = a.cod_asignatura " +
+                    "WHERE g.cod_asignatura = ? " +
+                    "ORDER BY dm.fecha_inscripcion DESC";
+
         List<Enrollment> enrollments = new ArrayList<>();
-        String sql = "SELECT * FROM enrollments WHERE course_id = ? ORDER BY enrollment_date DESC";
-        
+
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
-            stmt.setLong(1, courseId);
-            
+            stmt.setString(1, courseId.toString());
+
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     enrollments.add(mapResultSetToEnrollment(rs));
                 }
             }
         }
+
         return enrollments;
     }
 
-    public Optional<Enrollment> findByStudentAndCourse(Long studentId, Long courseId) throws SQLException {
-        String sql = "SELECT * FROM enrollments WHERE student_id = ? AND course_id = ?";
-        
+    public boolean update(Enrollment enrollment) throws SQLException {
+        String sql = "UPDATE DetalleMatricula SET estado = ? WHERE id_detalle = ?";
+
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
-            stmt.setLong(1, studentId);
-            stmt.setLong(2, courseId);
-            
+            stmt.setString(1, enrollment.getStatus().getDbValue());
+            stmt.setLong(2, enrollment.getIdDetalle());
+
+            int rowsAffected = stmt.executeUpdate();
+            if (rowsAffected > 0) {
+                logger.info("Enrollment updated successfully: {}", enrollment.getEnrollmentId());
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public boolean delete(Long enrollmentId) throws SQLException {
+        String sql = "UPDATE DetalleMatricula SET estado = 'cancelado' WHERE id_detalle = ?";
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setLong(1, enrollmentId);
+
+            int rowsAffected = stmt.executeUpdate();
+            if (rowsAffected > 0) {
+                logger.info("Enrollment cancelled successfully: {}", enrollmentId);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // Helper method to get or create matricula for a student in current period
+    private Long getOrCreateMatricula(String studentId, String periodo) throws SQLException {
+        // First try to find existing matricula
+        String findSql = "SELECT id_matricula FROM Matricula WHERE cod_estudiante = ? AND cod_periodo = ?";
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(findSql)) {
+
+            stmt.setString(1, studentId);
+            stmt.setString(2, periodo);
+
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
-                    return Optional.of(mapResultSetToEnrollment(rs));
+                    return rs.getLong("id_matricula");
                 }
             }
         }
-        return Optional.empty();
+
+        // If not found, create new matricula
+        String createSql = "INSERT INTO Matricula (cod_estudiante, cod_periodo, fecha_matricula, total_creditos, estado) VALUES (?, ?, ?, ?, ?)";
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(createSql, new String[]{"id_matricula"})) {
+
+            stmt.setString(1, studentId);
+            stmt.setString(2, periodo);
+            stmt.setTimestamp(3, Timestamp.valueOf(LocalDateTime.now()));
+            stmt.setInt(4, 0);
+            stmt.setString(5, "activa");
+
+            stmt.executeUpdate();
+
+            try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
+                if (generatedKeys.next()) {
+                    return generatedKeys.getLong(1);
+                }
+            }
+        }
+
+        throw new SQLException("Could not create or find matricula");
     }
 
-    public void update(Enrollment enrollment) throws SQLException {
-        String sql = "UPDATE enrollments SET student_id = ?, course_id = ?, enrollment_date = ?, status = ? WHERE enrollment_id = ?";
-        
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            
-            stmt.setLong(1, enrollment.getStudentId());
-            stmt.setLong(2, enrollment.getCourseId());
-            stmt.setDate(3, enrollment.getEnrollmentDate() != null ? 
-                Date.valueOf(enrollment.getEnrollmentDate()) : null);
-            stmt.setString(4, enrollment.getStatus().name());
-            stmt.setLong(5, enrollment.getEnrollmentId());
-            
-            stmt.executeUpdate();
-            logger.info("Enrollment updated: {}", enrollment.getEnrollmentId());
-        }
-    }
-
-    public void delete(Long enrollmentId) throws SQLException {
-        String sql = "DELETE FROM enrollments WHERE enrollment_id = ?";
-        
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            
-            stmt.setLong(1, enrollmentId);
-            stmt.executeUpdate();
-            logger.info("Enrollment deleted: {}", enrollmentId);
-        }
+    private String getCurrentPeriod() {
+        // For now, return a default period. This should be configurable
+        return "2025-I";
     }
 
     private Enrollment mapResultSetToEnrollment(ResultSet rs) throws SQLException {
         Enrollment enrollment = new Enrollment();
-        enrollment.setEnrollmentId(rs.getLong("enrollment_id"));
-        enrollment.setStudentId(rs.getLong("student_id"));
-        enrollment.setCourseId(rs.getLong("course_id"));
-        
-        Date enrollmentDate = rs.getDate("enrollment_date");
-        if (enrollmentDate != null) {
-            enrollment.setEnrollmentDate(enrollmentDate.toLocalDate());
+
+        enrollment.setEnrollmentId(rs.getLong("id_detalle"));
+        enrollment.setIdDetalle(rs.getLong("id_detalle"));
+        enrollment.setIdMatricula(rs.getLong("id_matricula"));
+        enrollment.setIdGrupo(rs.getLong("id_grupo"));
+        enrollment.setStudentId(rs.getString("cod_estudiante"));
+
+        // Map course ID from asignatura code
+        String codAsignatura = rs.getString("cod_asignatura");
+        if (codAsignatura != null) {
+            try {
+                enrollment.setCourseId(Long.parseLong(codAsignatura));
+            } catch (NumberFormatException e) {
+                enrollment.setCourseId((long) codAsignatura.hashCode() & 0x7fffffffL);
+            }
+        }
+
+        Timestamp fechaInscripcion = rs.getTimestamp("fecha_inscripcion");
+        if (fechaInscripcion != null) {
+            enrollment.setEnrollmentDate(fechaInscripcion.toLocalDateTime().toLocalDate());
         }
         
-        enrollment.setStatus(Enrollment.EnrollmentStatus.valueOf(rs.getString("status")));
-        
+        enrollment.setStatus(Enrollment.EnrollmentStatus.fromDbValue(rs.getString("estado")));
+
         return enrollment;
     }
 }

@@ -1,44 +1,76 @@
 package com.academictracker.model;
 
-import java.time.LocalDateTime;
-
 /**
- * User entity for authentication and authorization
+ * UsuarioSistema entity - Represents system users for authentication
  */
 public class User {
-    private Long userId;
+    private Long idUsuario;
     private String username;
     private String passwordHash;
-    private UserRole role;
-    private String email;
-    private boolean active;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    private UserRole rol;
+    private String idReferencia;
+    private String tipoReferencia;
+    private boolean activo;
 
     public enum UserRole {
-        ADMIN, TEACHER, STUDENT
+        ADMIN("admin"),
+        DOCENTE("docente"),
+        ESTUDIANTE("estudiante");
+
+        private final String value;
+
+        UserRole(String value) {
+            this.value = value;
+        }
+
+        public String getValue() {
+            return value;
+        }
+
+        public static UserRole fromString(String value) {
+            for (UserRole role : UserRole.values()) {
+                if (role.value.equalsIgnoreCase(value)) {
+                    return role;
+                }
+            }
+            throw new IllegalArgumentException("Unknown role: " + value);
+        }
+
+        @Override
+        public String toString() {
+            return value;
+        }
     }
 
     // Constructors
     public User() {
     }
 
-    public User(Long userId, String username, String passwordHash, UserRole role, String email) {
-        this.userId = userId;
+    public User(String username, String passwordHash, UserRole rol) {
         this.username = username;
         this.passwordHash = passwordHash;
-        this.role = role;
-        this.email = email;
-        this.active = true;
+        this.rol = rol;
+        this.activo = true;
+    }
+
+    public User(Long idUsuario, String username, String passwordHash, UserRole rol,
+                String idReferencia, String tipoReferencia) {
+        this.idUsuario = idUsuario;
+        this.username = username;
+        this.passwordHash = passwordHash;
+        this.rol = rol;
+        this.idReferencia = idReferencia;
+        this.tipoReferencia = tipoReferencia;
+        this.activo = true;
     }
 
     // Getters and Setters
-    public Long getUserId() {
-        return userId;
+    public Long getIdUsuario() {
+        return idUsuario;
     }
 
-    public void setUserId(Long userId) {
-        this.userId = userId;
+    public void setIdUsuario(Long idUsuario) {
+        this.idUsuario = idUsuario;
     }
 
     public String getUsername() {
@@ -57,54 +89,86 @@ public class User {
         this.passwordHash = passwordHash;
     }
 
+    public UserRole getRol() {
+        return rol;
+    }
+
+    public void setRol(UserRole rol) {
+        this.rol = rol;
+    }
+
+    public String getIdReferencia() {
+        return idReferencia;
+    }
+
+    public void setIdReferencia(String idReferencia) {
+        this.idReferencia = idReferencia;
+    }
+
+    public String getTipoReferencia() {
+        return tipoReferencia;
+    }
+
+    public void setTipoReferencia(String tipoReferencia) {
+        this.tipoReferencia = tipoReferencia;
+    }
+
+    public boolean isActivo() {
+        return activo;
+    }
+
+    public void setActivo(boolean activo) {
+        this.activo = activo;
+    }
+
+    // Legacy compatibility methods for existing code
+    public Long getUserId() {
+        return idUsuario;
+    }
+
+    public void setUserId(Long userId) {
+        this.idUsuario = userId;
+    }
+
     public UserRole getRole() {
-        return role;
+        return rol;
     }
 
     public void setRole(UserRole role) {
-        this.role = role;
+        this.rol = role;
     }
 
     public String getEmail() {
-        return email;
+        return ""; // For compatibility - email is now in Student/Teacher entities
     }
 
     public void setEmail(String email) {
-        this.email = email;
+        // For compatibility - email is now in Student/Teacher entities
     }
 
     public boolean isActive() {
-        return active;
+        return activo;
     }
 
     public void setActive(boolean active) {
-        this.active = active;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
+        this.activo = active;
     }
 
     @Override
     public String toString() {
-        return "User{" +
-                "userId=" + userId +
-                ", username='" + username + '\'' +
-                ", role=" + role +
-                ", email='" + email + '\'' +
-                ", active=" + active +
-                '}';
+        return username + " (" + rol + ")";
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) return true;
+        if (obj == null || getClass() != obj.getClass()) return false;
+        User user = (User) obj;
+        return idUsuario != null && idUsuario.equals(user.idUsuario);
+    }
+
+    @Override
+    public int hashCode() {
+        return idUsuario != null ? idUsuario.hashCode() : 0;
     }
 }

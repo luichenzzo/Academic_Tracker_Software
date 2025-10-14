@@ -40,7 +40,7 @@ public class UserService {
             }
 
             User user = userOpt.get();
-            if (!user.isActive()) {
+            if (!user.isActivo()) {
                 logger.warn("Login attempt with inactive account: {}", username);
                 return false;
             }
@@ -73,7 +73,7 @@ public class UserService {
     /**
      * Create new user with validation
      */
-    public User createUser(String username, String password, User.UserRole role, String email) throws Exception {
+    public User createUser(String username, String password, User.UserRole role, String idReferencia, String tipoReferencia) throws Exception {
         // Validate inputs
         if (!ValidationUtil.isValidUsername(username)) {
             throw new IllegalArgumentException("Invalid username format. Use 3-50 alphanumeric characters or underscore.");
@@ -81,12 +81,9 @@ public class UserService {
         if (!ValidationUtil.isValidPassword(password)) {
             throw new IllegalArgumentException("Password must be at least 6 characters long.");
         }
-        if (!ValidationUtil.isValidEmail(email)) {
-            throw new IllegalArgumentException("Invalid email format.");
-        }
 
         // Check if username already exists
-        if (userDAO.findByUsername(username).isPresent()) {
+        if (userDAO.existsByUsername(username)) {
             throw new IllegalArgumentException("Username already exists.");
         }
 
@@ -94,9 +91,10 @@ public class UserService {
         User user = new User();
         user.setUsername(username);
         user.setPasswordHash(PasswordUtil.hashPassword(password));
-        user.setRole(role);
-        user.setEmail(email);
-        user.setActive(true);
+        user.setRol(role);
+        user.setIdReferencia(idReferencia);
+        user.setTipoReferencia(tipoReferencia);
+        user.setActivo(true);
 
         return userDAO.create(user);
     }
@@ -105,16 +103,12 @@ public class UserService {
      * Update user
      */
     public void updateUser(User user) throws Exception {
-        if (user.getUserId() == null) {
+        if (user.getIdUsuario() == null) {
             throw new IllegalArgumentException("User ID cannot be null");
         }
 
         if (!ValidationUtil.isValidUsername(user.getUsername())) {
             throw new IllegalArgumentException("Invalid username format");
-        }
-
-        if (!ValidationUtil.isValidEmail(user.getEmail())) {
-            throw new IllegalArgumentException("Invalid email format");
         }
 
         userDAO.update(user);

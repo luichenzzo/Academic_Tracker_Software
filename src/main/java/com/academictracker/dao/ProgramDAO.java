@@ -11,39 +11,42 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Data Access Object for Program entity
+ * Data Access Object for Program entity - Bridge to ProgramaAcademico table
  */
 public class ProgramDAO {
     private static final Logger logger = LoggerFactory.getLogger(ProgramDAO.class);
 
     public Program create(Program program) throws SQLException {
-        String sql = "INSERT INTO programs (program_code, program_name, description, duration_years, credits_required) VALUES (?, ?, ?, ?, ?)";
-        
+        String sql = "INSERT INTO ProgramaAcademico (cod_programa, codigo_programa, nombre, creditos_totales, duracion_semestres, id_tipo_programa, id_facultad) VALUES (?, ?, ?, ?, ?, ?, ?)";
+
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql, new String[]{"program_id"})) {
-            
-            stmt.setString(1, program.getProgramCode());
-            stmt.setString(2, program.getProgramName());
-            stmt.setString(3, program.getDescription());
-            stmt.setInt(4, program.getDurationYears());
-            stmt.setInt(5, program.getCreditsRequired());
-            
-            stmt.executeUpdate();
-            
-            try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
-                if (generatedKeys.next()) {
-                    program.setProgramId(generatedKeys.getLong(1));
-                }
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setLong(1, program.getCodPrograma());
+            stmt.setString(2, program.getCodigoPrograma());
+            stmt.setString(3, program.getNombre());
+            stmt.setInt(4, program.getCreditosTotales() != null ? program.getCreditosTotales() : 0);
+            stmt.setInt(5, program.getDuracionSemestres() != null ? program.getDuracionSemestres() : 10);
+            stmt.setLong(6, program.getIdTipoPrograma() != null ? program.getIdTipoPrograma() : 1); // Default to pregrado
+            stmt.setLong(7, program.getIdFacultad() != null ? program.getIdFacultad() : 1); // Default faculty
+
+            int rowsAffected = stmt.executeUpdate();
+            if (rowsAffected == 0) {
+                throw new SQLException("Creating program failed, no rows affected.");
             }
             
-            logger.info("Program created: {}", program.getProgramName());
+            logger.info("Program created: {}", program.getNombre());
             return program;
         }
     }
 
     public Optional<Program> findById(Long programId) throws SQLException {
-        String sql = "SELECT * FROM programs WHERE program_id = ?";
-        
+        String sql = "SELECT p.*, tp.nombre as tipo_programa, f.nombre as facultad_nombre " +
+                    "FROM ProgramaAcademico p " +
+                    "LEFT JOIN TipoPrograma tp ON p.id_tipo_programa = tp.id_tipo_programa " +
+                    "LEFT JOIN Facultad f ON p.id_facultad = f.id_facultad " +
+                    "WHERE p.cod_programa = ?";
+
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
@@ -55,85 +58,140 @@ public class ProgramDAO {
                 }
             }
         }
-        return Optional.empty();
-    }
 
-    public Optional<Program> findByCode(String programCode) throws SQLException {
-        String sql = "SELECT * FROM programs WHERE program_code = ?";
-        
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            
-            stmt.setString(1, programCode);
-            
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    return Optional.of(mapResultSetToProgram(rs));
-                }
-            }
-        }
         return Optional.empty();
     }
 
     public List<Program> findAll() throws SQLException {
+        String sql = "SELECT p.*, tp.nombre as tipo_programa, f.nombre as facultad_nombre " +
+                    "FROM ProgramaAcademico p " +
+                    "LEFT JOIN TipoPrograma tp ON p.id_tipo_programa = tp.id_tipo_programa " +
+                    "LEFT JOIN Facultad f ON p.id_facultad = f.id_facultad " +
+                    "ORDER BY p.nombre";
+
         List<Program> programs = new ArrayList<>();
-        String sql = "SELECT * FROM programs ORDER BY program_name";
-        
+
         try (Connection conn = DatabaseConnection.getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-            
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
             while (rs.next()) {
                 programs.add(mapResultSetToProgram(rs));
             }
         }
+
         return programs;
     }
 
-    public void update(Program program) throws SQLException {
-        String sql = "UPDATE programs SET program_code = ?, program_name = ?, description = ?, duration_years = ?, credits_required = ? WHERE program_id = ?";
-        
+    public List<Program> findByFaculty(Long facultyId) throws SQLException {
+        String sql = "SELECT p.*, tp.nombre as tipo_programa, f.nombre as facultad_nombre " +
+                    "FROM ProgramaAcademico p " +
+                    "LEFT JOIN TipoPrograma tp ON p.id_tipo_programa = tp.id_tipo_programa " +
+                    "LEFT JOIN Facultad f ON p.id_facultad = f.id_facultad " +
+                    "WHERE p.id_facultad = ? " +
+                    "ORDER BY p.nombre";
+
+        List<Program> programs = new ArrayList<>();
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setLong(1, facultyId);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    programs.add(mapResultSetToProgram(rs));
+                }
+            }
+        }
+
+        return programs;
+    }
+
+    public boolean update(Program program) throws SQLException {
+        String sql = "UPDATE ProgramaAcademico SET codigo_programa = ?, nombre = ?, creditos_totales = ?, duracion_semestres = ?, id_tipo_programa = ?, id_facultad = ? WHERE cod_programa = ?";
+
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
-            stmt.setString(1, program.getProgramCode());
-            stmt.setString(2, program.getProgramName());
-            stmt.setString(3, program.getDescription());
-            stmt.setInt(4, program.getDurationYears());
-            stmt.setInt(5, program.getCreditsRequired());
-            stmt.setLong(6, program.getProgramId());
-            
-            stmt.executeUpdate();
-            logger.info("Program updated: {}", program.getProgramId());
+            stmt.setString(1, program.getCodigoPrograma());
+            stmt.setString(2, program.getNombre());
+            stmt.setInt(3, program.getCreditosTotales() != null ? program.getCreditosTotales() : 0);
+            stmt.setInt(4, program.getDuracionSemestres() != null ? program.getDuracionSemestres() : 10);
+            stmt.setLong(5, program.getIdTipoPrograma() != null ? program.getIdTipoPrograma() : 1);
+            stmt.setLong(6, program.getIdFacultad() != null ? program.getIdFacultad() : 1);
+            stmt.setLong(7, program.getCodPrograma());
+
+            int rowsAffected = stmt.executeUpdate();
+            if (rowsAffected > 0) {
+                logger.info("Program updated successfully: {}", program.getNombre());
+                return true;
+            }
         }
+
+        return false;
     }
 
-    public void delete(Long programId) throws SQLException {
-        String sql = "DELETE FROM programs WHERE program_id = ?";
-        
+    public boolean delete(Long programId) throws SQLException {
+        String sql = "DELETE FROM ProgramaAcademico WHERE cod_programa = ?";
+
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
             stmt.setLong(1, programId);
-            stmt.executeUpdate();
-            logger.info("Program deleted: {}", programId);
+
+            int rowsAffected = stmt.executeUpdate();
+            if (rowsAffected > 0) {
+                logger.info("Program deleted successfully: {}", programId);
+                return true;
+            }
         }
+
+        return false;
+    }
+
+    // Legacy compatibility methods
+    public Optional<Program> findByCode(String programCode) throws SQLException {
+        String sql = "SELECT p.*, tp.nombre as tipo_programa, f.nombre as facultad_nombre " +
+                    "FROM ProgramaAcademico p " +
+                    "LEFT JOIN TipoPrograma tp ON p.id_tipo_programa = tp.id_tipo_programa " +
+                    "LEFT JOIN Facultad f ON p.id_facultad = f.id_facultad " +
+                    "WHERE p.codigo_programa = ?";
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, programCode);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(mapResultSetToProgram(rs));
+                }
+            }
+        }
+
+        return Optional.empty();
     }
 
     private Program mapResultSetToProgram(ResultSet rs) throws SQLException {
         Program program = new Program();
-        program.setProgramId(rs.getLong("program_id"));
-        program.setProgramCode(rs.getString("program_code"));
-        program.setProgramName(rs.getString("program_name"));
-        program.setDescription(rs.getString("description"));
-        program.setDurationYears(rs.getInt("duration_years"));
-        program.setCreditsRequired(rs.getInt("credits_required"));
-        
-        Timestamp createdAt = rs.getTimestamp("created_at");
-        if (createdAt != null) {
-            program.setCreatedAt(createdAt.toLocalDateTime());
-        }
-        
+
+        program.setCodPrograma(rs.getLong("cod_programa"));
+        program.setCodigoPrograma(rs.getString("codigo_programa"));
+        program.setNombre(rs.getString("nombre"));
+        program.setCreditosTotales(rs.getInt("creditos_totales"));
+        program.setDuracionSemestres(rs.getInt("duracion_semestres"));
+        program.setIdTipoPrograma(rs.getLong("id_tipo_programa"));
+        program.setIdFacultad(rs.getLong("id_facultad"));
+
+        // Legacy compatibility fields
+        program.setProgramId(rs.getLong("cod_programa"));
+        program.setProgramCode(rs.getString("codigo_programa"));
+        program.setProgramName(rs.getString("nombre"));
+        program.setDescription(rs.getString("tipo_programa"));
+        program.setDurationYears(rs.getInt("duracion_semestres") / 2); // Convert semesters to years
+        program.setCreditsRequired(rs.getInt("creditos_totales"));
+
         return program;
     }
 }

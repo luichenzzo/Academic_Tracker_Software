@@ -36,7 +36,7 @@ public class SessionManager {
     }
 
     public boolean hasRole(User.UserRole role) {
-        return currentUser != null && currentUser.getRole() == role;
+        return currentUser != null && currentUser.getRol() == role;
     }
 
     public boolean isAdmin() {
@@ -44,10 +44,10 @@ public class SessionManager {
     }
 
     public boolean isTeacher() {
-        return hasRole(User.UserRole.TEACHER);
+        return hasRole(User.UserRole.DOCENTE);
     }
 
     public boolean isStudent() {
-        return hasRole(User.UserRole.STUDENT);
+        return hasRole(User.UserRole.ESTUDIANTE);
     }
 }
