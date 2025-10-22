@@ -470,48 +470,70 @@ public class AcademicService {
     }
 
     /**
-     * Create a new course group
+     * Create a new group
      */
-    public Grupo createGrupo(Integer numeroGrupo, Integer cupoMaximo, String codAsignatura,
-                            String codPeriodo, Long idSede) throws Exception {
-        if (numeroGrupo == null || numeroGrupo < 1) {
-            throw new IllegalArgumentException("Group number must be greater than 0");
-        }
+    public Grupo createGrupo(int numeroGrupo, int cupoMaximo, String codAsignatura, String codPeriodo, Long idSede) throws SQLException {
+        Grupo grupo = new Grupo();
+        grupo.setNumeroGrupo(numeroGrupo);
+        grupo.setCupoMaximo(cupoMaximo);
+        grupo.setCupoOcupado(0);
+        grupo.setCodAsignatura(codAsignatura);
+        grupo.setCodPeriodo(codPeriodo);
+        grupo.setIdSede(idSede);
+        grupo.setActivo(true);
 
-        if (cupoMaximo == null || cupoMaximo < 1) {
-            throw new IllegalArgumentException("Maximum capacity must be greater than 0");
-        }
-
-        Grupo grupo = new Grupo(numeroGrupo, cupoMaximo, codAsignatura, codPeriodo, idSede);
         return grupoDAO.create(grupo);
     }
 
     /**
      * Update an existing group
      */
-    public void updateGrupo(Grupo grupo) throws Exception {
-        if (grupo.getIdGrupo() == null) {
-            throw new IllegalArgumentException("Group ID cannot be null");
-        }
-
-        if (grupo.getNumeroGrupo() == null || grupo.getNumeroGrupo() < 1) {
-            throw new IllegalArgumentException("Group number must be greater than 0");
-        }
-
-        if (grupo.getCupoMaximo() == null || grupo.getCupoMaximo() < 1) {
-            throw new IllegalArgumentException("Maximum capacity must be greater than 0");
-        }
-
-        grupoDAO.update(grupo);
-        logger.info("Group {} updated successfully", grupo.getIdGrupo());
+    public boolean updateGrupo(Grupo grupo) throws SQLException {
+        return grupoDAO.update(grupo);
     }
 
     /**
-     * Delete (deactivate) a group
+     * Delete a group
      */
-    public void deleteGrupo(Long idGrupo) throws SQLException {
-        grupoDAO.delete(idGrupo);
-        logger.info("Group {} deactivated successfully", idGrupo);
+    public boolean deleteGrupo(Long idGrupo) throws SQLException {
+        return grupoDAO.delete(idGrupo);
+    }
+
+    // ==================== Matricula Operations ====================
+
+    /**
+     * Get all matriculas
+     */
+    public List<Matricula> getAllMatriculas() throws SQLException {
+        MatriculaDAO matriculaDAO = new MatriculaDAO();
+        return matriculaDAO.findAll();
+    }
+
+    /**
+     * Create a new matricula
+     */
+    public Matricula createMatricula(String codEstudiante, String codPeriodo, int totalCreditos, String estado) throws SQLException {
+        MatriculaDAO matriculaDAO = new MatriculaDAO();
+        Matricula matricula = new Matricula(codEstudiante, codPeriodo);
+        matricula.setTotalCreditos(totalCreditos);
+        matricula.setEstado(estado);
+        return matriculaDAO.create(matricula);
+    }
+
+    /**
+     * Update an existing matricula
+     */
+    public boolean updateMatricula(Matricula matricula) throws SQLException {
+        MatriculaDAO matriculaDAO = new MatriculaDAO();
+        return matriculaDAO.update(matricula);
+    }
+
+    /**
+     * Delete a matricula
+     */
+    public boolean deleteMatricula(Long idMatricula) throws SQLException {
+        MatriculaDAO matriculaDAO = new MatriculaDAO();
+        return matriculaDAO.delete(idMatricula);
     }
 
     // ==================== Teacher-Course Assignment Operations ====================

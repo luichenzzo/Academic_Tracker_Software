@@ -20,36 +20,55 @@ public class EnrollmentDAO {
     private static final Logger logger = LoggerFactory.getLogger(EnrollmentDAO.class);
 
     public Enrollment create(Enrollment enrollment) throws SQLException {
-        // First, ensure there's a matricula for this student and period
-        Long matriculaId = getOrCreateMatricula(enrollment.getStudentId(), getCurrentPeriod());
+        Connection conn = null;
+        PreparedStatement stmt = null;
+        ResultSet rs = null;
 
-        String sql = "INSERT INTO DetalleMatricula (id_matricula, id_grupo, fecha_inscripcion, estado, numero_intento) VALUES (?, ?, ?, ?, ?)";
+        try {
+            conn = DatabaseConnection.getConnection();
 
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql, new String[]{"id_detalle"})) {
+            // First, ensure there's a matricula for this student and period
+            Long matriculaId = getOrCreateMatricula(enrollment.getStudentId(), getCurrentPeriod());
 
-            stmt.setLong(1, matriculaId);
-            stmt.setLong(2, enrollment.getIdGrupo() != null ? enrollment.getIdGrupo() : 1); // Default group
-            stmt.setTimestamp(3, Timestamp.valueOf(LocalDateTime.now()));
-            stmt.setString(4, enrollment.getStatus().getDbValue());
-            stmt.setInt(5, 1); // First attempt
+            // Get the next available ID using Oracle pattern
+            String getMaxIdSql = "SELECT NVL(MAX(id_detalle), 0) + 1 AS next_id FROM DetalleMatricula";
+            stmt = conn.prepareStatement(getMaxIdSql);
+            rs = stmt.executeQuery();
+
+            long nextId = 1;
+            if (rs.next()) {
+                nextId = rs.getLong("next_id");
+            }
+            rs.close();
+            stmt.close();
+
+            // Now insert the new enrollment with the generated ID
+            String sql = "INSERT INTO DetalleMatricula (id_detalle, id_matricula, id_grupo, fecha_inscripcion, estado, numero_intento) " +
+                        "VALUES (?, ?, ?, ?, ?, ?)";
+
+            stmt = conn.prepareStatement(sql);
+            stmt.setLong(1, nextId);
+            stmt.setLong(2, matriculaId);
+            stmt.setLong(3, enrollment.getIdGrupo() != null ? enrollment.getIdGrupo() : 1); // Default group
+            stmt.setTimestamp(4, Timestamp.valueOf(LocalDateTime.now()));
+            stmt.setString(5, enrollment.getStatus().getDbValue());
+            stmt.setInt(6, 1); // First attempt
 
             int rowsAffected = stmt.executeUpdate();
             if (rowsAffected == 0) {
                 throw new SQLException("Creating enrollment failed, no rows affected.");
             }
 
-            try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
-                if (generatedKeys.next()) {
-                    enrollment.setEnrollmentId(generatedKeys.getLong(1));
-                    enrollment.setIdDetalle(generatedKeys.getLong(1));
-                } else {
-                    throw new SQLException("Creating enrollment failed, no ID obtained.");
-                }
-            }
-            
-            logger.info("Enrollment created for student: {}", enrollment.getStudentId());
+            enrollment.setEnrollmentId(nextId);
+            enrollment.setIdDetalle(nextId);
+
+            logger.info("Enrollment created for student: {} with ID: {}", enrollment.getStudentId(), nextId);
             return enrollment;
+
+        } finally {
+            if (rs != null) try { rs.close(); } catch (SQLException e) { /* ignore */ }
+            if (stmt != null) try { stmt.close(); } catch (SQLException e) { /* ignore */ }
+            if (conn != null) try { conn.close(); } catch (SQLException e) { /* ignore */ }
         }
     }
 
@@ -167,44 +186,57 @@ public class EnrollmentDAO {
 
     // Helper method to get or create matricula for a student in current period
     private Long getOrCreateMatricula(String studentId, String periodo) throws SQLException {
-        // First try to find existing matricula
-        String findSql = "SELECT id_matricula FROM Matricula WHERE cod_estudiante = ? AND cod_periodo = ?";
+        Connection conn = null;
+        PreparedStatement stmt = null;
+        ResultSet rs = null;
 
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(findSql)) {
+        try {
+            conn = DatabaseConnection.getConnection();
 
+            // First try to find existing matricula
+            String findSql = "SELECT id_matricula FROM Matricula WHERE cod_estudiante = ? AND cod_periodo = ?";
+            stmt = conn.prepareStatement(findSql);
             stmt.setString(1, studentId);
             stmt.setString(2, periodo);
+            rs = stmt.executeQuery();
 
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getLong("id_matricula");
-                }
+            if (rs.next()) {
+                Long matriculaId = rs.getLong("id_matricula");
+                return matriculaId;
             }
-        }
+            rs.close();
+            stmt.close();
 
-        // If not found, create new matricula
-        String createSql = "INSERT INTO Matricula (cod_estudiante, cod_periodo, fecha_matricula, total_creditos, estado) VALUES (?, ?, ?, ?, ?)";
+            // If not found, create new matricula using Oracle pattern
+            String getMaxIdSql = "SELECT NVL(MAX(id_matricula), 0) + 1 AS next_id FROM Matricula";
+            stmt = conn.prepareStatement(getMaxIdSql);
+            rs = stmt.executeQuery();
 
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(createSql, new String[]{"id_matricula"})) {
+            long nextId = 1;
+            if (rs.next()) {
+                nextId = rs.getLong("next_id");
+            }
+            rs.close();
+            stmt.close();
 
-            stmt.setString(1, studentId);
-            stmt.setString(2, periodo);
-            stmt.setTimestamp(3, Timestamp.valueOf(LocalDateTime.now()));
-            stmt.setInt(4, 0);
-            stmt.setString(5, "activa");
+            String createSql = "INSERT INTO Matricula (id_matricula, cod_estudiante, cod_periodo, fecha_matricula, total_creditos, estado) " +
+                              "VALUES (?, ?, ?, ?, ?, ?)";
+            stmt = conn.prepareStatement(createSql);
+            stmt.setLong(1, nextId);
+            stmt.setString(2, studentId);
+            stmt.setString(3, periodo);
+            stmt.setTimestamp(4, Timestamp.valueOf(LocalDateTime.now()));
+            stmt.setInt(5, 0);
+            stmt.setString(6, "activa");
 
             stmt.executeUpdate();
+            return nextId;
 
-            try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
-                if (generatedKeys.next()) {
-                    return generatedKeys.getLong(1);
-                }
-            }
+        } finally {
+            if (rs != null) try { rs.close(); } catch (SQLException e) { /* ignore */ }
+            if (stmt != null) try { stmt.close(); } catch (SQLException e) { /* ignore */ }
+            if (conn != null) try { conn.close(); } catch (SQLException e) { /* ignore */ }
         }
-
-        throw new SQLException("Could not create or find matricula");
     }
 
     private String getCurrentPeriod() {

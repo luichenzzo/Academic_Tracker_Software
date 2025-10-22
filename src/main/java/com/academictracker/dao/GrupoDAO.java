@@ -85,7 +85,7 @@ public class GrupoDAO {
     public List<Grupo> findAll() throws SQLException {
         String sql = "SELECT g.*, " +
                      "s.nombre as sede_nombre, " +
-                     "a.nombre as asignatura_nombre, " +
+                     "a.cod_asignatura, a.nombre as asignatura_nombre, a.creditos, a.semestre_sugerido, a.cod_programa, " +
                      "p.nombre as periodo_nombre " +
                      "FROM Grupo g " +
                      "LEFT JOIN Sede s ON g.id_sede = s.id_sede " +
@@ -109,7 +109,7 @@ public class GrupoDAO {
     public List<Grupo> findByAsignatura(String codAsignatura) throws SQLException {
         String sql = "SELECT g.*, " +
                      "s.nombre as sede_nombre, " +
-                     "a.nombre as asignatura_nombre, " +
+                     "a.cod_asignatura, a.nombre as asignatura_nombre, a.creditos, a.semestre_sugerido, a.cod_programa, " +
                      "p.nombre as periodo_nombre " +
                      "FROM Grupo g " +
                      "LEFT JOIN Sede s ON g.id_sede = s.id_sede " +
@@ -132,7 +132,7 @@ public class GrupoDAO {
         return grupos;
     }
 
-    public void update(Grupo grupo) throws SQLException {
+    public boolean update(Grupo grupo) throws SQLException {
         String sql = "UPDATE Grupo SET numero_grupo = ?, cupo_maximo = ?, cupo_ocupado = ?, " +
                      "cod_asignatura = ?, cod_periodo = ?, id_sede = ?, activo = ? WHERE id_grupo = ?";
 
@@ -148,20 +148,28 @@ public class GrupoDAO {
             stmt.setInt(7, grupo.isActivo() ? 1 : 0);
             stmt.setLong(8, grupo.getIdGrupo());
 
-            stmt.executeUpdate();
-            logger.info("Grupo updated: {}", grupo.getIdGrupo());
+            int rowsAffected = stmt.executeUpdate();
+            if (rowsAffected > 0) {
+                logger.info("Grupo updated: {}", grupo.getIdGrupo());
+                return true;
+            }
+            return false;
         }
     }
 
-    public void delete(Long idGrupo) throws SQLException {
+    public boolean delete(Long idGrupo) throws SQLException {
         String sql = "UPDATE Grupo SET activo = 0 WHERE id_grupo = ?";
 
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setLong(1, idGrupo);
-            stmt.executeUpdate();
-            logger.info("Grupo deactivated: {}", idGrupo);
+            int rowsAffected = stmt.executeUpdate();
+            if (rowsAffected > 0) {
+                logger.info("Grupo deactivated: {}", idGrupo);
+                return true;
+            }
+            return false;
         }
     }
 
@@ -203,6 +211,15 @@ public class GrupoDAO {
             com.academictracker.model.Asignatura asignatura = new com.academictracker.model.Asignatura();
             asignatura.setCodAsignatura(rs.getString("cod_asignatura"));
             asignatura.setNombre(asignaturaNombre);
+
+            try {
+                asignatura.setCreditos(rs.getInt("creditos"));
+                asignatura.setSemestreSugerido(rs.getInt("semestre_sugerido"));
+                asignatura.setCodPrograma(rs.getLong("cod_programa"));
+            } catch (SQLException e) {
+                logger.debug("Some asignatura fields not available in result set");
+            }
+
             grupo.setAsignatura(asignatura);
         }
 

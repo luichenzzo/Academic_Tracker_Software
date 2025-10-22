@@ -73,6 +73,16 @@ public class AdminDashboardController {
     @FXML private TableColumn<Grupo, String> groupCapacityColumn;
     @FXML private TableColumn<Grupo, Integer> groupEnrolledColumn;
 
+    // Matricula Management
+    @FXML private TableView<Matricula> matriculaTable;
+    @FXML private TableColumn<Matricula, Long> matriculaIdColumn;
+    @FXML private TableColumn<Matricula, String> matriculaStudentColumn;
+    @FXML private TableColumn<Matricula, String> matriculaStudentNameColumn;
+    @FXML private TableColumn<Matricula, String> matriculaPeriodColumn;
+    @FXML private TableColumn<Matricula, String> matriculaDateColumn;
+    @FXML private TableColumn<Matricula, Integer> matriculaCreditsColumn;
+    @FXML private TableColumn<Matricula, String> matriculaStatusColumn;
+
     // User / Account Activation Management: show Students and Teachers and allow "Activate"
     @FXML private TableView<AccountCandidate> userTable;
     @FXML private TableColumn<AccountCandidate, String> userTypeColumn;
@@ -189,6 +199,23 @@ public class AdminDashboardController {
         });
         groupEnrolledColumn.setCellValueFactory(new PropertyValueFactory<>("cupoOcupado"));
 
+        // Matricula table
+        matriculaIdColumn.setCellValueFactory(new PropertyValueFactory<>("idMatricula"));
+        matriculaStudentColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
+            cellData.getValue().getEstudiante() != null ? cellData.getValue().getEstudiante().getCodEstudiante() : "N/A"
+        ));
+        matriculaStudentNameColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
+            cellData.getValue().getEstudiante() != null ? cellData.getValue().getEstudiante().getNombres() + " " + cellData.getValue().getEstudiante().getApellidos() : "N/A"
+        ));
+        matriculaPeriodColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
+            cellData.getValue().getPeriodoAcademico() != null ? cellData.getValue().getPeriodoAcademico().getNombre() : "N/A"
+        ));
+        matriculaDateColumn.setCellValueFactory(new PropertyValueFactory<>("fechaMatricula"));
+        matriculaCreditsColumn.setCellValueFactory(new PropertyValueFactory<>("totalCreditos"));
+        matriculaStatusColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
+            cellData.getValue().getEstado()
+        ));
+
         // User/account candidate table setup
         userTypeColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getType()));
         userRefColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getReferenceId()));
@@ -204,6 +231,7 @@ public class AdminDashboardController {
         loadCourses();
         loadGroups();
         loadAccountCandidates();
+        loadMatriculas();
     }
     
     private void loadStudents() {
@@ -253,6 +281,16 @@ public class AdminDashboardController {
         } catch (Exception e) {
             logger.error("Error loading groups", e);
             showAlert("Error", "Failed to load groups: " + e.getMessage());
+        }
+    }
+
+    private void loadMatriculas() {
+        try {
+            ObservableList<Matricula> matriculas = FXCollections.observableArrayList(academicService.getAllMatriculas());
+            matriculaTable.setItems(matriculas);
+        } catch (Exception e) {
+            logger.error("Error loading matriculas", e);
+            showAlert("Error", "Failed to load matriculas: " + e.getMessage());
         }
     }
 
@@ -710,18 +748,6 @@ public class AdminDashboardController {
         dialog.getDialogPane().setContent(grid);
         dialog.getDialogPane().setPrefWidth(500);
         dialog.showAndWait();
-    }
-
-    private void addDetailRow(GridPane grid, int row, String label, String value) {
-        Label labelNode = new Label(label);
-        labelNode.setStyle("-fx-font-weight: bold; -fx-font-size: 13px;");
-
-        Label valueNode = new Label(value != null ? value : "N/A");
-        valueNode.setStyle("-fx-font-size: 13px;");
-        valueNode.setWrapText(true);
-
-        grid.add(labelNode, 0, row);
-        grid.add(valueNode, 1, row);
     }
 
     // ==================== Teacher UI Handlers ====================
@@ -1813,6 +1839,293 @@ public class AdminDashboardController {
         dialog.getDialogPane().setContent(grid);
         dialog.getDialogPane().setPrefWidth(500);
         dialog.showAndWait();
+    }
+
+    // ==================== Matricula UI Handlers ====================
+
+    @FXML
+    private void handleCreateMatricula() {
+        try {
+            List<Student> students = academicService.getAllStudents();
+            List<PeriodoAcademico> periodos = academicService.getAllPeriodos();
+
+            if (students.isEmpty()) {
+                showAlert("No Students", "No students available. Please add students first.");
+                return;
+            }
+
+            if (periodos.isEmpty()) {
+                showAlert("No Periods", "No academic periods available. Please contact the administrator.");
+                return;
+            }
+
+            Dialog<Matricula> dialog = new Dialog<>();
+            dialog.setTitle("Create Matricula");
+            dialog.setHeaderText("Create a new student enrollment in a period");
+
+            ButtonType createButtonType = new ButtonType("Create", ButtonBar.ButtonData.OK_DONE);
+            dialog.getDialogPane().getButtonTypes().addAll(createButtonType, ButtonType.CANCEL);
+
+            GridPane grid = new GridPane();
+            grid.setHgap(10);
+            grid.setVgap(10);
+            grid.setPadding(new Insets(20, 150, 10, 10));
+
+            // Student selection
+            ComboBox<Student> studentCombo = new ComboBox<>();
+            studentCombo.setItems(FXCollections.observableArrayList(students));
+            studentCombo.setPromptText("Select a student");
+            studentCombo.setButtonCell(new ListCell<Student>() {
+                @Override
+                protected void updateItem(Student item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null :
+                        item.getCodEstudiante() + " - " + item.getNombres() + " " + item.getApellidos());
+                }
+            });
+            studentCombo.setCellFactory(lv -> new ListCell<Student>() {
+                @Override
+                protected void updateItem(Student item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null :
+                        item.getCodEstudiante() + " - " + item.getNombres() + " " + item.getApellidos());
+                }
+            });
+
+            // Period selection
+            ComboBox<PeriodoAcademico> periodoCombo = new ComboBox<>();
+            periodoCombo.setItems(FXCollections.observableArrayList(periodos));
+            periodoCombo.setPromptText("Select academic period");
+            periodoCombo.setButtonCell(new ListCell<PeriodoAcademico>() {
+                @Override
+                protected void updateItem(PeriodoAcademico item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null : item.getCodPeriodo() + " - " + item.getNombre());
+                }
+            });
+            periodoCombo.setCellFactory(lv -> new ListCell<PeriodoAcademico>() {
+                @Override
+                protected void updateItem(PeriodoAcademico item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null : item.getCodPeriodo() + " - " + item.getNombre());
+                }
+            });
+
+            // Status selection
+            ComboBox<String> statusCombo = new ComboBox<>();
+            statusCombo.getItems().addAll("activa", "inactiva", "cancelada", "completada");
+            statusCombo.setValue("activa");
+
+            TextField creditosField = new TextField("0");
+            creditosField.setPromptText("Total credits");
+
+            grid.add(new Label("Student:"), 0, 0);
+            grid.add(studentCombo, 1, 0);
+            grid.add(new Label("Academic Period:"), 0, 1);
+            grid.add(periodoCombo, 1, 1);
+            grid.add(new Label("Status:"), 0, 2);
+            grid.add(statusCombo, 1, 2);
+            grid.add(new Label("Total Credits:"), 0, 3);
+            grid.add(creditosField, 1, 3);
+
+            dialog.getDialogPane().setContent(grid);
+
+            dialog.setResultConverter(dialogButton -> {
+                if (dialogButton == createButtonType) {
+                    try {
+                        if (studentCombo.getValue() == null) {
+                            showAlert("Validation Error", "Please select a student.");
+                            return null;
+                        }
+                        if (periodoCombo.getValue() == null) {
+                            showAlert("Validation Error", "Please select an academic period.");
+                            return null;
+                        }
+
+                        int creditos = Integer.parseInt(creditosField.getText().trim());
+
+                        Matricula created = academicService.createMatricula(
+                                studentCombo.getValue().getCodEstudiante(),
+                                periodoCombo.getValue().getCodPeriodo(),
+                                creditos,
+                                statusCombo.getValue()
+                        );
+                        return created;
+                    } catch (NumberFormatException nfe) {
+                        showAlert("Validation Error", "Please enter a valid number for credits.");
+                        return null;
+                    } catch (Exception e) {
+                        logger.error("Error creating matricula", e);
+                        showAlert("Error", "Failed to create matricula: " + e.getMessage());
+                        return null;
+                    }
+                }
+                return null;
+            });
+
+            Optional<Matricula> result = dialog.showAndWait();
+            result.ifPresent(m -> {
+                showAlert("Success", "Matricula created successfully!");
+                loadMatriculas();
+            });
+
+        } catch (Exception e) {
+            logger.error("Error in handleCreateMatricula", e);
+            showAlert("Error", "An unexpected error occurred: " + e.getMessage());
+        }
+    }
+
+    @FXML
+    private void handleEditMatricula() {
+        Matricula selected = matriculaTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showAlert("No Selection", "Please select a matricula to edit.");
+            return;
+        }
+
+        try {
+            Dialog<Matricula> dialog = new Dialog<>();
+            dialog.setTitle("Edit Matricula");
+            dialog.setHeaderText("Edit matricula information");
+
+            ButtonType saveButtonType = new ButtonType("Save", ButtonBar.ButtonData.OK_DONE);
+            dialog.getDialogPane().getButtonTypes().addAll(saveButtonType, ButtonType.CANCEL);
+
+            GridPane grid = new GridPane();
+            grid.setHgap(10);
+            grid.setVgap(10);
+            grid.setPadding(new Insets(20, 150, 10, 10));
+
+            Label studentLabel = new Label(selected.getCodEstudiante() +
+                (selected.getEstudiante() != null ? " - " + selected.getEstudiante().getNombres() + " " +
+                selected.getEstudiante().getApellidos() : ""));
+            Label periodLabel = new Label(selected.getCodPeriodo() +
+                (selected.getPeriodoAcademico() != null ? " - " + selected.getPeriodoAcademico().getNombre() : ""));
+
+            ComboBox<String> statusCombo = new ComboBox<>();
+            statusCombo.getItems().addAll("activa", "inactiva", "cancelada", "completada");
+            statusCombo.setValue(selected.getEstado() != null ? selected.getEstado() : "activa");
+
+            TextField creditosField = new TextField(selected.getTotalCreditos() != null ?
+                selected.getTotalCreditos().toString() : "0");
+
+            grid.add(new Label("Student:"), 0, 0);
+            grid.add(studentLabel, 1, 0);
+            grid.add(new Label("Academic Period:"), 0, 1);
+            grid.add(periodLabel, 1, 1);
+            grid.add(new Label("Status:"), 0, 2);
+            grid.add(statusCombo, 1, 2);
+            grid.add(new Label("Total Credits:"), 0, 3);
+            grid.add(creditosField, 1, 3);
+
+            dialog.getDialogPane().setContent(grid);
+
+            dialog.setResultConverter(dialogButton -> {
+                if (dialogButton == saveButtonType) {
+                    try {
+                        selected.setEstado(statusCombo.getValue());
+                        selected.setTotalCreditos(Integer.parseInt(creditosField.getText().trim()));
+
+                        academicService.updateMatricula(selected);
+                        return selected;
+                    } catch (NumberFormatException nfe) {
+                        showAlert("Validation Error", "Please enter a valid number for credits.");
+                        return null;
+                    } catch (Exception e) {
+                        logger.error("Error updating matricula", e);
+                        showAlert("Error", "Failed to update matricula: " + e.getMessage());
+                        return null;
+                    }
+                }
+                return null;
+            });
+
+            Optional<Matricula> result = dialog.showAndWait();
+            result.ifPresent(m -> {
+                showAlert("Success", "Matricula updated successfully!");
+                loadMatriculas();
+            });
+
+        } catch (Exception e) {
+            logger.error("Error in handleEditMatricula", e);
+            showAlert("Error", "An unexpected error occurred: " + e.getMessage());
+        }
+    }
+
+    @FXML
+    private void handleDeleteMatricula() {
+        Matricula selected = matriculaTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showAlert("No Selection", "Please select a matricula to delete.");
+            return;
+        }
+
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        confirm.setTitle("Confirm Deletion");
+        confirm.setHeaderText("Delete Matricula");
+        confirm.setContentText("Are you sure you want to delete matricula ID " + selected.getIdMatricula() +
+                " for student " + selected.getCodEstudiante() + "?");
+
+        Optional<ButtonType> res = confirm.showAndWait();
+        if (res.isPresent() && res.get() == ButtonType.OK) {
+            try {
+                academicService.deleteMatricula(selected.getIdMatricula());
+                showAlert("Success", "Matricula deleted successfully!");
+                loadMatriculas();
+            } catch (Exception e) {
+                logger.error("Error deleting matricula", e);
+                showAlert("Error", "Failed to delete matricula: " + e.getMessage());
+            }
+        }
+    }
+
+    @FXML
+    private void handleViewMatriculaDetails() {
+        Matricula selected = matriculaTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showAlert("No Selection", "Please select a matricula to view details.");
+            return;
+        }
+
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("Matricula Details");
+        dialog.setHeaderText("Complete Matricula Information");
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+
+        GridPane grid = new GridPane();
+        grid.setHgap(15);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(20, 20, 20, 20));
+
+        int row = 0;
+        addDetailRow(grid, row++, "Matricula ID:", selected.getIdMatricula() != null ? selected.getIdMatricula().toString() : "N/A");
+        addDetailRow(grid, row++, "Student Code:", selected.getCodEstudiante());
+        addDetailRow(grid, row++, "Student Name:", selected.getEstudiante() != null ?
+                selected.getEstudiante().getNombres() + " " + selected.getEstudiante().getApellidos() : "N/A");
+        addDetailRow(grid, row++, "Academic Period:", selected.getCodPeriodo());
+        addDetailRow(grid, row++, "Period Name:", selected.getPeriodoAcademico() != null ?
+                selected.getPeriodoAcademico().getNombre() : "N/A");
+        addDetailRow(grid, row++, "Enrollment Date:", selected.getFechaMatricula() != null ?
+                selected.getFechaMatricula().toString() : "N/A");
+        addDetailRow(grid, row++, "Total Credits:", selected.getTotalCreditos() != null ?
+                selected.getTotalCreditos().toString() : "0");
+        addDetailRow(grid, row++, "Status:", selected.getEstado() != null ? selected.getEstado() : "N/A");
+
+        dialog.getDialogPane().setContent(grid);
+        dialog.getDialogPane().setPrefWidth(500);
+        dialog.showAndWait();
+    }
+
+    private void addDetailRow(GridPane grid, int row, String label, String value) {
+        Label labelNode = new Label(label);
+        labelNode.setStyle("-fx-font-weight: bold; -fx-font-size: 13px;");
+
+        Label valueNode = new Label(value != null ? value : "N/A");
+        valueNode.setStyle("-fx-font-size: 13px;");
+        valueNode.setWrapText(true);
+
+        grid.add(labelNode, 0, row);
+        grid.add(valueNode, 1, row);
     }
 
     private void showAlert(String title, String message) {

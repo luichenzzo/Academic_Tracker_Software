@@ -96,6 +96,28 @@ public class StudentDAO {
         return Optional.empty();
     }
 
+    public Optional<Student> findByCorreoInstitucional(String correoInstitucional) throws SQLException {
+        String sql = "SELECT e.*, p.nombre as programa_nombre, s.nombre as sede_nombre " +
+                    "FROM Estudiante e " +
+                    "LEFT JOIN ProgramaAcademico p ON e.cod_programa = p.cod_programa " +
+                    "LEFT JOIN Sede s ON e.id_sede = s.id_sede " +
+                    "WHERE e.correo_institucional = ? AND e.activo = 1";
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, correoInstitucional);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(mapResultSetToStudent(rs));
+                }
+            }
+        }
+
+        return Optional.empty();
+    }
+
     public List<Student> findAll() throws SQLException {
         String sql = "SELECT e.*, p.nombre as programa_nombre, s.nombre as sede_nombre " +
                     "FROM Estudiante e " +

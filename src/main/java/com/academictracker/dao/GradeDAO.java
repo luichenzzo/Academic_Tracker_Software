@@ -18,38 +18,57 @@ public class GradeDAO {
     private static final Logger logger = LoggerFactory.getLogger(GradeDAO.class);
 
     public Grade create(Grade grade) throws SQLException {
-        // First, find or create a ReglaEvaluacion for the grade
-        Long reglaId = getOrCreateReglaEvaluacion(grade.getEnrollmentId(), "Evaluación General", 100.0);
+        Connection conn = null;
+        PreparedStatement stmt = null;
+        ResultSet rs = null;
 
-        String sql = "INSERT INTO Calificacion (id_detalle, id_regla, nota, fecha_registro, id_docente_registra) VALUES (?, ?, ?, ?, ?)";
+        try {
+            conn = DatabaseConnection.getConnection();
 
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql, new String[]{"id_calificacion"})) {
+            // First, find or create a ReglaEvaluacion for the grade
+            Long reglaId = getOrCreateReglaEvaluacion(grade.getEnrollmentId(), "Evaluación General", 100.0);
 
-            stmt.setLong(1, grade.getEnrollmentId()); // Maps to id_detalle
-            stmt.setLong(2, reglaId);
-            stmt.setDouble(3, grade.getGradeValue() != null ? grade.getGradeValue() : 0.0);
-            stmt.setTimestamp(4, Timestamp.valueOf(LocalDateTime.now()));
-            stmt.setLong(5, grade.getGradedBy() != null ? grade.getGradedBy() : 1); // Default teacher
+            // Get the next available ID using Oracle pattern
+            String getMaxIdSql = "SELECT NVL(MAX(id_calificacion), 0) + 1 AS next_id FROM Calificacion";
+            stmt = conn.prepareStatement(getMaxIdSql);
+            rs = stmt.executeQuery();
+
+            long nextId = 1;
+            if (rs.next()) {
+                nextId = rs.getLong("next_id");
+            }
+            rs.close();
+            stmt.close();
+
+            // Now insert the new grade with the generated ID
+            String sql = "INSERT INTO Calificacion (id_calificacion, id_detalle, id_regla, nota, fecha_registro, id_docente_registra) " +
+                        "VALUES (?, ?, ?, ?, ?, ?)";
+
+            stmt = conn.prepareStatement(sql);
+            stmt.setLong(1, nextId);
+            stmt.setLong(2, grade.getEnrollmentId()); // Maps to id_detalle
+            stmt.setLong(3, reglaId);
+            stmt.setDouble(4, grade.getGradeValue() != null ? grade.getGradeValue() : 0.0);
+            stmt.setTimestamp(5, Timestamp.valueOf(LocalDateTime.now()));
+            stmt.setLong(6, grade.getGradedBy() != null ? grade.getGradedBy() : 1); // Default teacher
 
             int rowsAffected = stmt.executeUpdate();
             if (rowsAffected == 0) {
                 throw new SQLException("Creating grade failed, no rows affected.");
             }
 
-            try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
-                if (generatedKeys.next()) {
-                    grade.setGradeId(generatedKeys.getLong(1));
-                } else {
-                    throw new SQLException("Creating grade failed, no ID obtained.");
-                }
-            }
-            
+            grade.setGradeId(nextId);
+
             // Also create/update NotaDefinitiva if this is a final grade
             updateNotaDefinitiva(grade.getEnrollmentId(), grade.getGradeValue());
 
-            logger.info("Grade created for enrollment: {}", grade.getEnrollmentId());
+            logger.info("Grade created for enrollment: {} with ID: {}", grade.getEnrollmentId(), nextId);
             return grade;
+
+        } finally {
+            if (rs != null) try { rs.close(); } catch (SQLException e) { /* ignore */ }
+            if (stmt != null) try { stmt.close(); } catch (SQLException e) { /* ignore */ }
+            if (conn != null) try { conn.close(); } catch (SQLException e) { /* ignore */ }
         }
     }
 
@@ -169,62 +188,71 @@ public class GradeDAO {
 
     // Helper method to get or create ReglaEvaluacion
     private Long getOrCreateReglaEvaluacion(Long enrollmentId, String nombreItem, Double porcentaje) throws SQLException {
-        // Find the group for this enrollment
-        String findGroupSql = "SELECT dm.id_grupo FROM DetalleMatricula dm WHERE dm.id_detalle = ?";
-        Long grupoId = null;
+        Connection conn = null;
+        PreparedStatement stmt = null;
+        ResultSet rs = null;
 
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(findGroupSql)) {
+        try {
+            conn = DatabaseConnection.getConnection();
 
+            // Find the group for this enrollment
+            String findGroupSql = "SELECT dm.id_grupo FROM DetalleMatricula dm WHERE dm.id_detalle = ?";
+            stmt = conn.prepareStatement(findGroupSql);
             stmt.setLong(1, enrollmentId);
+            rs = stmt.executeQuery();
 
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    grupoId = rs.getLong("id_grupo");
-                }
+            Long grupoId = null;
+            if (rs.next()) {
+                grupoId = rs.getLong("id_grupo");
             }
-        }
+            rs.close();
+            stmt.close();
 
-        if (grupoId == null) {
-            throw new SQLException("Could not find group for enrollment");
-        }
+            if (grupoId == null) {
+                throw new SQLException("Could not find group for enrollment");
+            }
 
-        // Try to find existing regla
-        String findReglaSql = "SELECT id_regla FROM ReglaEvaluacion WHERE id_grupo = ? AND nombre_item = ?";
-
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(findReglaSql)) {
-
+            // Try to find existing regla
+            String findReglaSql = "SELECT id_regla FROM ReglaEvaluacion WHERE id_grupo = ? AND nombre_item = ?";
+            stmt = conn.prepareStatement(findReglaSql);
             stmt.setLong(1, grupoId);
             stmt.setString(2, nombreItem);
+            rs = stmt.executeQuery();
 
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getLong("id_regla");
-                }
+            if (rs.next()) {
+                Long reglaId = rs.getLong("id_regla");
+                return reglaId;
             }
-        }
+            rs.close();
+            stmt.close();
 
-        // Create new regla if not found
-        String createReglaSql = "INSERT INTO ReglaEvaluacion (id_grupo, nombre_item, porcentaje) VALUES (?, ?, ?)";
+            // Create new regla if not found - use Oracle pattern
+            String getMaxIdSql = "SELECT NVL(MAX(id_regla), 0) + 1 AS next_id FROM ReglaEvaluacion";
+            stmt = conn.prepareStatement(getMaxIdSql);
+            rs = stmt.executeQuery();
 
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(createReglaSql, new String[]{"id_regla"})) {
+            long nextId = 1;
+            if (rs.next()) {
+                nextId = rs.getLong("next_id");
+            }
+            rs.close();
+            stmt.close();
 
-            stmt.setLong(1, grupoId);
-            stmt.setString(2, nombreItem);
-            stmt.setBigDecimal(3, java.math.BigDecimal.valueOf(porcentaje));
+            String createReglaSql = "INSERT INTO ReglaEvaluacion (id_regla, id_grupo, nombre_item, porcentaje) VALUES (?, ?, ?, ?)";
+            stmt = conn.prepareStatement(createReglaSql);
+            stmt.setLong(1, nextId);
+            stmt.setLong(2, grupoId);
+            stmt.setString(3, nombreItem);
+            stmt.setBigDecimal(4, java.math.BigDecimal.valueOf(porcentaje));
 
             stmt.executeUpdate();
+            return nextId;
 
-            try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
-                if (generatedKeys.next()) {
-                    return generatedKeys.getLong(1);
-                }
-            }
+        } finally {
+            if (rs != null) try { rs.close(); } catch (SQLException e) { /* ignore */ }
+            if (stmt != null) try { stmt.close(); } catch (SQLException e) { /* ignore */ }
+            if (conn != null) try { conn.close(); } catch (SQLException e) { /* ignore */ }
         }
-
-        throw new SQLException("Could not create or find ReglaEvaluacion");
     }
 
     // Helper method to update NotaDefinitiva

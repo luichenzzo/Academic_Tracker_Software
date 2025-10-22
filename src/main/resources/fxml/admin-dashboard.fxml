@@ -167,6 +167,33 @@
                 </VBox>
             </Tab>
             
+            <!-- Matriculas Tab -->
+            <Tab text="Matriculas">
+                <VBox spacing="10" style="-fx-padding: 15;">
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Button text="Create Matricula" styleClass="primary-button" onAction="#handleCreateMatricula"/>
+                        <Button text="Edit Matricula" styleClass="secondary-button" onAction="#handleEditMatricula"/>
+                        <Button text="Delete Matricula" styleClass="danger-button" onAction="#handleDeleteMatricula"/>
+                        <Button text="View Details" onAction="#handleViewMatriculaDetails"/>
+                    </HBox>
+
+                    <TableView fx:id="matriculaTable" VBox.vgrow="ALWAYS">
+                        <columns>
+                            <TableColumn fx:id="matriculaIdColumn" text="ID" prefWidth="80"/>
+                            <TableColumn fx:id="matriculaStudentColumn" text="Student Code" prefWidth="120"/>
+                            <TableColumn fx:id="matriculaStudentNameColumn" text="Student Name" prefWidth="200"/>
+                            <TableColumn fx:id="matriculaPeriodColumn" text="Period" prefWidth="120"/>
+                            <TableColumn fx:id="matriculaDateColumn" text="Date" prefWidth="150"/>
+                            <TableColumn fx:id="matriculaCreditsColumn" text="Credits" prefWidth="80"/>
+                            <TableColumn fx:id="matriculaStatusColumn" text="Status" prefWidth="100"/>
+                        </columns>
+                        <placeholder>
+                            <Label text="No matriculas found. Click 'Create Matricula' to add a new matricula." style="-fx-text-fill: gray;"/>
+                        </placeholder>
+                    </TableView>
+                </VBox>
+            </Tab>
+
             <!-- Users Tab -->
             <Tab text="User Management">
                 <VBox spacing="10" style="-fx-padding: 15;">

@@ -100,6 +100,11 @@ public class Matricula {
         }
     }
 
+    // Helper method to check if matricula is active based on estado
+    public boolean isActivo() {
+        return "activa".equalsIgnoreCase(this.estado);
+    }
+
     @Override
     public String toString() {
         return "Matrícula " + idMatricula + " - " + codEstudiante + " (" + codPeriodo + ")";
