@@ -24,6 +24,9 @@ public class AcademicService {
     private final EnrollmentDAO enrollmentDAO;
     private final GradeDAO gradeDAO;
     private final SedeDAO sedeDAO;
+    private final GrupoDAO grupoDAO;
+    private final DocenteGrupoDAO docenteGrupoDAO;
+    private final PeriodoAcademicoDAO periodoAcademicoDAO;
 
     public AcademicService() {
         this.studentDAO = new StudentDAO();
@@ -33,6 +36,9 @@ public class AcademicService {
         this.enrollmentDAO = new EnrollmentDAO();
         this.gradeDAO = new GradeDAO();
         this.sedeDAO = new SedeDAO();
+        this.grupoDAO = new GrupoDAO();
+        this.docenteGrupoDAO = new DocenteGrupoDAO();
+        this.periodoAcademicoDAO = new PeriodoAcademicoDAO();
     }
 
     // ==================== Student Operations ====================
@@ -445,5 +451,131 @@ public class AcademicService {
 
     public Optional<Sede> getSedeById(Long idSede) throws SQLException {
         return sedeDAO.findById(idSede);
+    }
+
+    // ==================== Grupo Operations ====================
+
+    /**
+     * Get all course groups
+     */
+    public List<Grupo> getAllGrupos() throws SQLException {
+        return grupoDAO.findAll();
+    }
+
+    /**
+     * Get groups for a specific course (asignatura)
+     */
+    public List<Grupo> getGruposByAsignatura(String codAsignatura) throws SQLException {
+        return grupoDAO.findByAsignatura(codAsignatura);
+    }
+
+    /**
+     * Create a new course group
+     */
+    public Grupo createGrupo(Integer numeroGrupo, Integer cupoMaximo, String codAsignatura,
+                            String codPeriodo, Long idSede) throws Exception {
+        if (numeroGrupo == null || numeroGrupo < 1) {
+            throw new IllegalArgumentException("Group number must be greater than 0");
+        }
+
+        if (cupoMaximo == null || cupoMaximo < 1) {
+            throw new IllegalArgumentException("Maximum capacity must be greater than 0");
+        }
+
+        Grupo grupo = new Grupo(numeroGrupo, cupoMaximo, codAsignatura, codPeriodo, idSede);
+        return grupoDAO.create(grupo);
+    }
+
+    /**
+     * Update an existing group
+     */
+    public void updateGrupo(Grupo grupo) throws Exception {
+        if (grupo.getIdGrupo() == null) {
+            throw new IllegalArgumentException("Group ID cannot be null");
+        }
+
+        if (grupo.getNumeroGrupo() == null || grupo.getNumeroGrupo() < 1) {
+            throw new IllegalArgumentException("Group number must be greater than 0");
+        }
+
+        if (grupo.getCupoMaximo() == null || grupo.getCupoMaximo() < 1) {
+            throw new IllegalArgumentException("Maximum capacity must be greater than 0");
+        }
+
+        grupoDAO.update(grupo);
+        logger.info("Group {} updated successfully", grupo.getIdGrupo());
+    }
+
+    /**
+     * Delete (deactivate) a group
+     */
+    public void deleteGrupo(Long idGrupo) throws SQLException {
+        grupoDAO.delete(idGrupo);
+        logger.info("Group {} deactivated successfully", idGrupo);
+    }
+
+    // ==================== Teacher-Course Assignment Operations ====================
+
+    /**
+     * Assign a teacher to a course group
+     */
+    public void assignTeacherToGroup(Long idDocente, Long idGrupo, double horasGrupo, boolean esPrincipal) throws Exception {
+        // Validate teacher exists
+        Optional<Teacher> teacher = teacherDAO.findById(idDocente);
+        if (!teacher.isPresent()) {
+            throw new IllegalArgumentException("Teacher not found");
+        }
+
+        // Validate group exists
+        Optional<Grupo> grupo = grupoDAO.findById(idGrupo);
+        if (!grupo.isPresent()) {
+            throw new IllegalArgumentException("Group not found");
+        }
+
+        // Check if already assigned
+        if (docenteGrupoDAO.isTeacherAssignedToGroup(idDocente, idGrupo)) {
+            throw new IllegalArgumentException("Teacher is already assigned to this group");
+        }
+
+        docenteGrupoDAO.assignTeacherToGroup(idDocente, idGrupo, horasGrupo, esPrincipal);
+        logger.info("Teacher {} assigned to group {}", idDocente, idGrupo);
+    }
+
+    /**
+     * Remove a teacher from a course group
+     */
+    public void removeTeacherFromGroup(Long idDocente, Long idGrupo) throws SQLException {
+        docenteGrupoDAO.removeTeacherFromGroup(idDocente, idGrupo);
+        logger.info("Teacher {} removed from group {}", idDocente, idGrupo);
+    }
+
+    /**
+     * Get all teachers assigned to a group with details
+     */
+    public List<DocenteGrupoDAO.TeacherGroupAssignment> getTeacherAssignments(Long idGrupo) throws SQLException {
+        return docenteGrupoDAO.getTeacherAssignmentsWithDetails(idGrupo);
+    }
+
+    /**
+     * Check if a teacher is assigned to a group
+     */
+    public boolean isTeacherAssignedToGroup(Long idDocente, Long idGrupo) throws SQLException {
+        return docenteGrupoDAO.isTeacherAssignedToGroup(idDocente, idGrupo);
+    }
+
+    // ==================== Periodo Academico Operations ====================
+
+    /**
+     * Get all academic periods
+     */
+    public List<PeriodoAcademico> getAllPeriodos() throws SQLException {
+        return periodoAcademicoDAO.findAll();
+    }
+
+    /**
+     * Get academic period by code
+     */
+    public Optional<PeriodoAcademico> getPeriodoById(String codPeriodo) throws SQLException {
+        return periodoAcademicoDAO.findById(codPeriodo);
     }
 }

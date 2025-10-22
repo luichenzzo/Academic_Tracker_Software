@@ -113,7 +113,7 @@
                         <Button text="Add Course" styleClass="primary-button"/>
                         <Button text="Edit Course" styleClass="secondary-button"/>
                         <Button text="Delete Course" styleClass="danger-button"/>
-                        <Button text="Assign Teacher"/>
+                        <Button text="Assign Teacher" onAction="#handleAssignTeacher"/>
                     </HBox>
                     
                     <TableView fx:id="courseTable" VBox.vgrow="ALWAYS">
@@ -127,6 +127,33 @@
                 </VBox>
             </Tab>
             
+            <!-- Groups Tab -->
+            <Tab text="Groups">
+                <VBox spacing="10" style="-fx-padding: 15;">
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Button text="Add Group" styleClass="primary-button" onAction="#handleAddGroup"/>
+                        <Button text="Edit Group" styleClass="secondary-button" onAction="#handleEditGroup"/>
+                        <Button text="Delete Group" styleClass="danger-button" onAction="#handleDeleteGroup"/>
+                        <Button text="View Details" onAction="#handleViewGroupDetails"/>
+                    </HBox>
+
+                    <TableView fx:id="groupTable" VBox.vgrow="ALWAYS">
+                        <columns>
+                            <TableColumn fx:id="groupIdColumn" text="ID" prefWidth="60"/>
+                            <TableColumn fx:id="groupNumberColumn" text="Group #" prefWidth="80"/>
+                            <TableColumn fx:id="groupCourseColumn" text="Course" prefWidth="200"/>
+                            <TableColumn fx:id="groupPeriodColumn" text="Period" prefWidth="120"/>
+                            <TableColumn fx:id="groupSedeColumn" text="Sede" prefWidth="120"/>
+                            <TableColumn fx:id="groupCapacityColumn" text="Capacity" prefWidth="100"/>
+                            <TableColumn fx:id="groupEnrolledColumn" text="Enrolled" prefWidth="100"/>
+                        </columns>
+                        <placeholder>
+                            <Label text="No groups found. Click 'Add Group' to create a new group." style="-fx-text-fill: gray;"/>
+                        </placeholder>
+                    </TableView>
+                </VBox>
+            </Tab>
+
             <!-- Enrollments Tab -->
             <Tab text="Enrollments">
                 <VBox spacing="10" style="-fx-padding: 15;">
@@ -141,16 +168,28 @@
             </Tab>
             
             <!-- Users Tab -->
-            <Tab text="Users">
+            <Tab text="User Management">
                 <VBox spacing="10" style="-fx-padding: 15;">
                     <HBox spacing="10" alignment="CENTER_LEFT">
-                        <Button text="Add User" styleClass="primary-button"/>
-                        <Button text="Edit User" styleClass="secondary-button"/>
-                        <Button text="Delete User" styleClass="danger-button"/>
-                        <Button text="Reset Password"/>
+                        <Button text="Activate Account" styleClass="primary-button" onAction="#handleActivateAccount"/>
+                        <Button text="View Details" onAction="#handleViewAccountDetails"/>
+                        <Button text="Refresh" styleClass="secondary-button" onAction="#handleRefresh"/>
+                        <Region HBox.hgrow="ALWAYS"/>
+                        <Button text="Logout" styleClass="danger-button" onAction="#handleLogout"/>
                     </HBox>
-                    
-                    <Label text="User management will be displayed here" style="-fx-font-size: 16px; -fx-padding: 20;"/>
+
+                    <TableView fx:id="userTable" VBox.vgrow="ALWAYS">
+                        <columns>
+                            <TableColumn fx:id="userTypeColumn" text="Type" prefWidth="100"/>
+                            <TableColumn fx:id="userRefColumn" text="ID" prefWidth="120"/>
+                            <TableColumn fx:id="userNameColumn" text="Name" prefWidth="200"/>
+                            <TableColumn fx:id="userEmailColumn" text="Email" prefWidth="220"/>
+                            <TableColumn fx:id="userStatusColumn" text="Account Status" prefWidth="140"/>
+                        </columns>
+                        <placeholder>
+                            <Label text="No students or teachers found." style="-fx-text-fill: gray;"/>
+                        </placeholder>
+                    </TableView>
                 </VBox>
             </Tab>
             

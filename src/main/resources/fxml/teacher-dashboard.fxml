@@ -12,9 +12,9 @@
         <VBox>
             <MenuBar>
                 <Menu text="File">
-                    <MenuItem text="Refresh"/>
+                    <MenuItem text="Refresh" onAction="#handleRefresh"/>
                     <SeparatorMenuItem/>
-                    <MenuItem text="Logout"/>
+                    <MenuItem text="Logout" onAction="#handleLogout"/>
                 </Menu>
             </MenuBar>
             
@@ -30,21 +30,40 @@
     
     <center>
         <TabPane tabClosingPolicy="UNAVAILABLE">
-            <Tab text="My Courses">
+            <Tab text="My Groups">
                 <VBox spacing="10" style="-fx-padding: 15;">
-                    <Label text="Your assigned courses will be displayed here" style="-fx-font-size: 16px;"/>
+                    <Label text="Your Assigned Course Groups" style="-fx-font-size: 16px; -fx-font-weight: bold;"/>
+
+                    <TableView fx:id="groupsTable" VBox.vgrow="ALWAYS">
+                        <columns>
+                            <TableColumn fx:id="groupNumberColumn" text="Group #" prefWidth="80"/>
+                            <TableColumn fx:id="courseCodeColumn" text="Course Code" prefWidth="120"/>
+                            <TableColumn fx:id="courseNameColumn" text="Course Name" prefWidth="250"/>
+                            <TableColumn fx:id="periodColumn" text="Period" prefWidth="120"/>
+                            <TableColumn fx:id="sedeColumn" text="Sede" prefWidth="120"/>
+                            <TableColumn fx:id="capacityColumn" text="Capacity" prefWidth="100"/>
+                            <TableColumn fx:id="enrolledColumn" text="Enrolled" prefWidth="100"/>
+                            <TableColumn fx:id="hoursColumn" text="Hours/Week" prefWidth="100"/>
+                            <TableColumn fx:id="isPrincipalColumn" text="Main Teacher" prefWidth="100"/>
+                        </columns>
+                        <placeholder>
+                            <Label text="No groups assigned yet" style="-fx-text-fill: gray;"/>
+                        </placeholder>
+                    </TableView>
                 </VBox>
             </Tab>
             
             <Tab text="Students">
                 <VBox spacing="10" style="-fx-padding: 15;">
                     <Label text="Students enrolled in your courses" style="-fx-font-size: 16px;"/>
+                    <Label text="(Coming soon)" style="-fx-text-fill: gray;"/>
                 </VBox>
             </Tab>
             
             <Tab text="Grades">
                 <VBox spacing="10" style="-fx-padding: 15;">
                     <Label text="Manage student grades" style="-fx-font-size: 16px;"/>
+                    <Label text="(Coming soon)" style="-fx-text-fill: gray;"/>
                 </VBox>
             </Tab>
         </TabPane>

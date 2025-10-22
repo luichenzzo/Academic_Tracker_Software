@@ -75,9 +75,21 @@ public class UserService {
      */
     public User createUser(String username, String password, User.UserRole role, String idReferencia, String tipoReferencia) throws Exception {
         // Validate inputs
-        if (!ValidationUtil.isValidUsername(username)) {
-            throw new IllegalArgumentException("Invalid username format. Use 3-50 alphanumeric characters or underscore.");
+        if (username == null || username.trim().isEmpty()) {
+            throw new IllegalArgumentException("Username is required");
         }
+
+        // Accept either a normal username or an email address
+        if (username.contains("@")) {
+            if (!com.academictracker.util.ValidationUtil.isValidEmail(username)) {
+                throw new IllegalArgumentException("Invalid email format for username.");
+            }
+        } else {
+            if (!ValidationUtil.isValidUsername(username)) {
+                throw new IllegalArgumentException("Invalid username format. Use 3-50 alphanumeric characters or underscore.");
+            }
+        }
+
         if (!ValidationUtil.isValidPassword(password)) {
             throw new IllegalArgumentException("Password must be at least 6 characters long.");
         }
@@ -97,6 +109,13 @@ public class UserService {
         user.setActivo(true);
 
         return userDAO.create(user);
+    }
+
+    /**
+     * Check if a username already exists (expose DAO method)
+     */
+    public boolean existsByUsername(String username) throws SQLException {
+        return userDAO.existsByUsername(username);
     }
 
     /**
@@ -137,6 +156,25 @@ public class UserService {
         user.setPasswordHash(PasswordUtil.hashPassword(newPassword));
         userDAO.update(user);
         logger.info("Password changed for user: {}", user.getUsername());
+    }
+
+    /**
+     * Reset a user's password (admin action). Sets the password to the provided newPassword.
+     */
+    public void resetPassword(Long userId, String newPassword) throws Exception {
+        if (!ValidationUtil.isValidPassword(newPassword)) {
+            throw new IllegalArgumentException("New password must be at least 6 characters long");
+        }
+
+        Optional<User> userOpt = userDAO.findById(userId);
+        if (userOpt.isEmpty()) {
+            throw new IllegalArgumentException("User not found");
+        }
+
+        User user = userOpt.get();
+        user.setPasswordHash(PasswordUtil.hashPassword(newPassword));
+        userDAO.update(user);
+        logger.info("Password reset for user: {}", user.getUsername());
     }
 
     /**

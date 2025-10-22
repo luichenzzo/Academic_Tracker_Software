@@ -62,7 +62,25 @@ public class AdminDashboardController {
     @FXML private TableColumn<Course, String> courseCodeColumn;
     @FXML private TableColumn<Course, String> courseNameColumn;
     @FXML private TableColumn<Course, Integer> courseCreditsColumn;
-    
+
+    // Group Management
+    @FXML private TableView<Grupo> groupTable;
+    @FXML private TableColumn<Grupo, Long> groupIdColumn;
+    @FXML private TableColumn<Grupo, String> groupNumberColumn;
+    @FXML private TableColumn<Grupo, String> groupCourseColumn;
+    @FXML private TableColumn<Grupo, String> groupPeriodColumn;
+    @FXML private TableColumn<Grupo, String> groupSedeColumn;
+    @FXML private TableColumn<Grupo, String> groupCapacityColumn;
+    @FXML private TableColumn<Grupo, Integer> groupEnrolledColumn;
+
+    // User / Account Activation Management: show Students and Teachers and allow "Activate"
+    @FXML private TableView<AccountCandidate> userTable;
+    @FXML private TableColumn<AccountCandidate, String> userTypeColumn;
+    @FXML private TableColumn<AccountCandidate, String> userRefColumn;
+    @FXML private TableColumn<AccountCandidate, String> userNameColumn;
+    @FXML private TableColumn<AccountCandidate, String> userEmailColumn;
+    @FXML private TableColumn<AccountCandidate, String> userStatusColumn;
+
     private final UserService userService;
     private final AcademicService academicService;
     
@@ -71,6 +89,29 @@ public class AdminDashboardController {
         this.academicService = new AcademicService();
     }
     
+    // Lightweight wrapper to present students and teachers in a single table
+    public static class AccountCandidate {
+        private final String type; // "Student" or "Teacher"
+        private final String referenceId; // cod_estudiante or id_docente
+        private final String name;
+        private final String email;
+        private final boolean active;
+
+        public AccountCandidate(String type, String referenceId, String name, String email, boolean active) {
+            this.type = type;
+            this.referenceId = referenceId;
+            this.name = name;
+            this.email = email;
+            this.active = active;
+        }
+
+        public String getType() { return type; }
+        public String getReferenceId() { return referenceId; }
+        public String getName() { return name; }
+        public String getEmail() { return email; }
+        public boolean isActive() { return active; }
+    }
+
     @FXML
     private void initialize() {
         User currentUser = SessionManager.getInstance().getCurrentUser();
@@ -118,6 +159,42 @@ public class AdminDashboardController {
         courseCodeColumn.setCellValueFactory(new PropertyValueFactory<>("courseCode"));
         courseNameColumn.setCellValueFactory(new PropertyValueFactory<>("courseName"));
         courseCreditsColumn.setCellValueFactory(new PropertyValueFactory<>("credits"));
+
+        // Group table
+        groupIdColumn.setCellValueFactory(new PropertyValueFactory<>("idGrupo"));
+        groupNumberColumn.setCellValueFactory(new PropertyValueFactory<>("numeroGrupo"));
+        groupCourseColumn.setCellValueFactory(cellData -> {
+            Asignatura asignatura = cellData.getValue().getAsignatura();
+            return new javafx.beans.property.SimpleStringProperty(
+                asignatura != null ? asignatura.getNombre() : cellData.getValue().getCodAsignatura()
+            );
+        });
+        groupPeriodColumn.setCellValueFactory(cellData -> {
+            PeriodoAcademico periodo = cellData.getValue().getPeriodoAcademico();
+            return new javafx.beans.property.SimpleStringProperty(
+                periodo != null ? periodo.getNombre() : cellData.getValue().getCodPeriodo()
+            );
+        });
+        groupSedeColumn.setCellValueFactory(cellData -> {
+            Sede sede = cellData.getValue().getSede();
+            return new javafx.beans.property.SimpleStringProperty(
+                sede != null ? sede.getNombre() : "N/A"
+            );
+        });
+        groupCapacityColumn.setCellValueFactory(cellData -> {
+            Grupo g = cellData.getValue();
+            return new javafx.beans.property.SimpleStringProperty(
+                g.getCupoOcupado() + " / " + g.getCupoMaximo()
+            );
+        });
+        groupEnrolledColumn.setCellValueFactory(new PropertyValueFactory<>("cupoOcupado"));
+
+        // User/account candidate table setup
+        userTypeColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getType()));
+        userRefColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getReferenceId()));
+        userNameColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getName()));
+        userEmailColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getEmail()));
+        userStatusColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().isActive() ? "Has account" : "No account"));
     }
     
     private void loadData() {
@@ -125,6 +202,8 @@ public class AdminDashboardController {
         loadTeachers();
         loadPrograms();
         loadCourses();
+        loadGroups();
+        loadAccountCandidates();
     }
     
     private void loadStudents() {
@@ -164,6 +243,56 @@ public class AdminDashboardController {
         } catch (Exception e) {
             logger.error("Error loading courses", e);
             showAlert("Error", "Failed to load courses: " + e.getMessage());
+        }
+    }
+
+    private void loadGroups() {
+        try {
+            ObservableList<Grupo> groups = FXCollections.observableArrayList(academicService.getAllGrupos());
+            groupTable.setItems(groups);
+        } catch (Exception e) {
+            logger.error("Error loading groups", e);
+            showAlert("Error", "Failed to load groups: " + e.getMessage());
+        }
+    }
+
+    private void loadAccountCandidates() {
+        try {
+            List<Student> students = academicService.getAllStudents();
+            List<Teacher> teachers = academicService.getAllTeachers();
+
+            ObservableList<AccountCandidate> items = FXCollections.observableArrayList();
+
+            // Students: cod_estudiante is the reference id, email is correoInstitucional
+            for (Student s : students) {
+                boolean hasAccount = false;
+                try {
+                    if (s.getCorreoInstitucional() != null) {
+                        hasAccount = userService.existsByUsername(s.getCorreoInstitucional());
+                    }
+                } catch (Exception ex) {
+                    logger.warn("Failed to check user existence for student {}: {}", s.getCodEstudiante(), ex.getMessage());
+                }
+                items.add(new AccountCandidate("Student", s.getCodEstudiante(), s.getNombres() + " " + s.getApellidos(), s.getCorreoInstitucional(), hasAccount));
+            }
+
+            // Teachers: id_docente -> idDocente, email -> correoInstitucional
+            for (Teacher t : teachers) {
+                boolean hasAccount = false;
+                try {
+                    if (t.getCorreoInstitucional() != null) {
+                        hasAccount = userService.existsByUsername(t.getCorreoInstitucional());
+                    }
+                } catch (Exception ex) {
+                    logger.warn("Failed to check user existence for teacher {}: {}", t.getIdDocente(), ex.getMessage());
+                }
+                items.add(new AccountCandidate("Teacher", t.getIdDocente() != null ? t.getIdDocente().toString() : "", t.getNombres() + " " + t.getApellidos(), t.getCorreoInstitucional(), hasAccount));
+            }
+
+            userTable.setItems(items);
+        } catch (Exception e) {
+            logger.error("Error loading account candidates", e);
+            showAlert("Error", "Failed to load account candidates: " + e.getMessage());
         }
     }
 
@@ -1017,6 +1146,71 @@ public class AdminDashboardController {
         dialog.showAndWait();
     }
 
+    // ==================== User UI Handlers ====================
+
+    @FXML
+    private void handleActivateAccount() {
+        AccountCandidate selected = userTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showAlert("No Selection", "Please select a student or teacher to activate.");
+            return;
+        }
+
+        try {
+            String username = selected.getEmail();
+
+            // Generate password: lowercase first name + "123"
+            String fullName = selected.getName();
+            String firstName = fullName.split(" ")[0]; // Get first name from full name
+            String password = firstName.toLowerCase() + "123";
+
+            User.UserRole role = selected.getType().equalsIgnoreCase("Teacher") ? User.UserRole.DOCENTE : User.UserRole.ESTUDIANTE;
+
+            // idReferencia should be the reference id (for students it's cod_estudiante, for teachers the id_docente)
+            String idReferencia = selected.getReferenceId();
+            String tipoReferencia = selected.getType().equalsIgnoreCase("Teacher") ? "Docente" : "Estudiante";
+
+            // Create user via service (will validate duplicates)
+            userService.createUser(username, password, role, idReferencia, tipoReferencia);
+
+            showAlert("Success", "Account created for " + selected.getName() + " (" + username + ") with password '" + password + "'.");
+            loadAccountCandidates();
+        } catch (Exception e) {
+            logger.error("Error activating account", e);
+            showAlert("Error", "Failed to activate account: " + e.getMessage());
+        }
+    }
+
+    @FXML
+    private void handleViewAccountDetails() {
+        AccountCandidate selected = userTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showAlert("No Selection", "Please select a student or teacher to view details.");
+            return;
+        }
+
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("Account Candidate Details");
+        dialog.setHeaderText("Information");
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+
+        GridPane grid = new GridPane();
+        grid.setHgap(15);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(20, 20, 20, 20));
+
+        int row = 0;
+        addDetailRow(grid, row++, "Type:", selected.getType());
+        addDetailRow(grid, row++, "Reference ID:", selected.getReferenceId());
+        addDetailRow(grid, row++, "Full Name:", selected.getName());
+        addDetailRow(grid, row++, "Email:", selected.getEmail());
+        addDetailRow(grid, row++, "Status:", selected.isActive() ? "Has account" : "No account");
+
+        dialog.getDialogPane().setContent(grid);
+        dialog.getDialogPane().setPrefWidth(450);
+        dialog.showAndWait();
+    }
+
     @FXML
     private void handleRefresh() {
         loadData();
@@ -1024,8 +1218,187 @@ public class AdminDashboardController {
     }
     
     @FXML
+    private void handleAssignTeacher() {
+        try {
+            // Get all courses and teachers
+            List<Course> courses = academicService.getAllCourses();
+            List<Teacher> teachers = academicService.getAllTeachers();
+            List<Grupo> grupos = academicService.getAllGrupos();
+
+            if (courses.isEmpty()) {
+                showAlert("No Courses", "No courses available. Please add courses first.");
+                return;
+            }
+
+            if (teachers.isEmpty()) {
+                showAlert("No Teachers", "No teachers available. Please add teachers first.");
+                return;
+            }
+
+            // Create dialog
+            Dialog<Boolean> dialog = new Dialog<>();
+            dialog.setTitle("Assign Teacher to Course");
+            dialog.setHeaderText("Select a course and teacher to assign");
+
+            ButtonType assignButtonType = new ButtonType("Assign", ButtonBar.ButtonData.OK_DONE);
+            dialog.getDialogPane().getButtonTypes().addAll(assignButtonType, ButtonType.CANCEL);
+
+            GridPane grid = new GridPane();
+            grid.setHgap(10);
+            grid.setVgap(10);
+            grid.setPadding(new Insets(20, 150, 10, 10));
+
+            // Course selection
+            ComboBox<Course> courseCombo = new ComboBox<>();
+            courseCombo.setItems(FXCollections.observableArrayList(courses));
+            courseCombo.setPromptText("Select a course");
+
+            // Set cell factory for course display
+            courseCombo.setButtonCell(new ListCell<Course>() {
+                @Override
+                protected void updateItem(Course item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null : item.getCourseCode() + " - " + item.getCourseName());
+                }
+            });
+            courseCombo.setCellFactory(lv -> new ListCell<Course>() {
+                @Override
+                protected void updateItem(Course item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null : item.getCourseCode() + " - " + item.getCourseName());
+                }
+            });
+
+            // Group selection (will be populated based on course selection)
+            ComboBox<Grupo> grupoCombo = new ComboBox<>();
+            grupoCombo.setPromptText("Select a group");
+            grupoCombo.setDisable(true);
+
+            // Set cell factory for group display
+            grupoCombo.setButtonCell(new ListCell<Grupo>() {
+                @Override
+                protected void updateItem(Grupo item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null : "Group " + item.getNumeroGrupo());
+                }
+            });
+            grupoCombo.setCellFactory(lv -> new ListCell<Grupo>() {
+                @Override
+                protected void updateItem(Grupo item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null : "Group " + item.getNumeroGrupo());
+                }
+            });
+
+            // When course is selected, load its groups
+            courseCombo.setOnAction(e -> {
+                Course selectedCourse = courseCombo.getValue();
+                if (selectedCourse != null) {
+                    try {
+                        List<Grupo> courseGroups = academicService.getGruposByAsignatura(selectedCourse.getCourseCode());
+                        grupoCombo.setItems(FXCollections.observableArrayList(courseGroups));
+                        grupoCombo.setDisable(courseGroups.isEmpty());
+                        if (courseGroups.isEmpty()) {
+                            showAlert("No Groups", "This course has no groups. Groups are needed to assign teachers.");
+                        }
+                    } catch (Exception ex) {
+                        logger.error("Error loading groups for course", ex);
+                        showAlert("Error", "Failed to load groups: " + ex.getMessage());
+                    }
+                }
+            });
+
+            // Teacher selection
+            ComboBox<Teacher> teacherCombo = new ComboBox<>();
+            teacherCombo.setItems(FXCollections.observableArrayList(teachers));
+            teacherCombo.setPromptText("Select a teacher");
+
+            // Set cell factory for teacher display
+            teacherCombo.setButtonCell(new ListCell<Teacher>() {
+                @Override
+                protected void updateItem(Teacher item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null : item.getNombres() + " " + item.getApellidos());
+                }
+            });
+            teacherCombo.setCellFactory(lv -> new ListCell<Teacher>() {
+                @Override
+                protected void updateItem(Teacher item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null : item.getNombres() + " " + item.getApellidos());
+                }
+            });
+
+            // Hours per week
+            TextField horasField = new TextField("3.0");
+            horasField.setPromptText("Hours per week");
+
+            // Principal teacher checkbox
+            CheckBox principalCheckBox = new CheckBox("Main Teacher");
+            principalCheckBox.setSelected(true);
+
+            grid.add(new Label("Course:"), 0, 0);
+            grid.add(courseCombo, 1, 0);
+            grid.add(new Label("Group:"), 0, 1);
+            grid.add(grupoCombo, 1, 1);
+            grid.add(new Label("Teacher:"), 0, 2);
+            grid.add(teacherCombo, 1, 2);
+            grid.add(new Label("Hours per week:"), 0, 3);
+            grid.add(horasField, 1, 3);
+            grid.add(principalCheckBox, 1, 4);
+
+            dialog.getDialogPane().setContent(grid);
+
+            dialog.setResultConverter(dialogButton -> {
+                if (dialogButton == assignButtonType) {
+                    if (courseCombo.getValue() == null || grupoCombo.getValue() == null || teacherCombo.getValue() == null) {
+                        showAlert("Validation Error", "Please select a course, group, and teacher.");
+                        return false;
+                    }
+
+                    try {
+                        double horas = Double.parseDouble(horasField.getText());
+                        if (horas <= 0 || horas > 40) {
+                            showAlert("Validation Error", "Hours must be between 0 and 40.");
+                            return false;
+                        }
+
+                        Grupo grupo = grupoCombo.getValue();
+                        Teacher teacher = teacherCombo.getValue();
+                        boolean esPrincipal = principalCheckBox.isSelected();
+
+                        academicService.assignTeacherToGroup(teacher.getIdDocente(), grupo.getIdGrupo(), horas, esPrincipal);
+
+                        showAlert("Success",
+                            "Teacher " + teacher.getNombres() + " " + teacher.getApellidos() +
+                            " assigned to " + courseCombo.getValue().getCourseName() +
+                            " (Group " + grupo.getNumeroGrupo() + ")");
+
+                        return true;
+                    } catch (NumberFormatException ex) {
+                        showAlert("Validation Error", "Please enter a valid number for hours.");
+                        return false;
+                    } catch (Exception ex) {
+                        logger.error("Error assigning teacher", ex);
+                        showAlert("Error", "Failed to assign teacher: " + ex.getMessage());
+                        return false;
+                    }
+                }
+                return false;
+            });
+
+            dialog.showAndWait();
+
+        } catch (Exception e) {
+            logger.error("Error in handleAssignTeacher", e);
+            showAlert("Error", "An unexpected error occurred: " + e.getMessage());
+        }
+    }
+
+    @FXML
     private void handleLogout() {
-        userService.logout();
+        SessionManager.getInstance().logout();
+
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/login.fxml"));
             Scene scene = new Scene(loader.load(), 400, 300);
@@ -1039,7 +1412,409 @@ public class AdminDashboardController {
             logger.error("Error during logout", e);
         }
     }
-    
+
+    // ==================== Group UI Handlers ====================
+
+    @FXML
+    private void handleAddGroup() {
+        try {
+            // Load necessary data
+            List<Course> courses = academicService.getAllCourses();
+            List<PeriodoAcademico> periodos = academicService.getAllPeriodos();
+            List<Sede> sedes = academicService.getAllSedes();
+
+            if (courses.isEmpty()) {
+                showAlert("No Courses", "No courses available. Please add courses first.");
+                return;
+            }
+
+            if (periodos.isEmpty()) {
+                showAlert("No Periods", "No academic periods available. Please contact the administrator.");
+                return;
+            }
+
+            if (sedes.isEmpty()) {
+                showAlert("No Sedes", "No sedes available. Please contact the administrator.");
+                return;
+            }
+
+            Dialog<Grupo> dialog = new Dialog<>();
+            dialog.setTitle("Add New Group");
+            dialog.setHeaderText("Create a new course group");
+
+            ButtonType addButtonType = new ButtonType("Add", ButtonBar.ButtonData.OK_DONE);
+            dialog.getDialogPane().getButtonTypes().addAll(addButtonType, ButtonType.CANCEL);
+
+            GridPane grid = new GridPane();
+            grid.setHgap(10);
+            grid.setVgap(10);
+            grid.setPadding(new Insets(20, 150, 10, 10));
+
+            // Course selection
+            ComboBox<Course> courseCombo = new ComboBox<>();
+            courseCombo.setItems(FXCollections.observableArrayList(courses));
+            courseCombo.setPromptText("Select a course");
+            courseCombo.setButtonCell(new ListCell<Course>() {
+                @Override
+                protected void updateItem(Course item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null : item.getCourseCode() + " - " + item.getCourseName());
+                }
+            });
+            courseCombo.setCellFactory(lv -> new ListCell<Course>() {
+                @Override
+                protected void updateItem(Course item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null : item.getCourseCode() + " - " + item.getCourseName());
+                }
+            });
+
+            // Period selection
+            ComboBox<PeriodoAcademico> periodoCombo = new ComboBox<>();
+            periodoCombo.setItems(FXCollections.observableArrayList(periodos));
+            periodoCombo.setPromptText("Select academic period");
+            periodoCombo.setButtonCell(new ListCell<PeriodoAcademico>() {
+                @Override
+                protected void updateItem(PeriodoAcademico item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null : item.getCodPeriodo() + " - " + item.getNombre());
+                }
+            });
+            periodoCombo.setCellFactory(lv -> new ListCell<PeriodoAcademico>() {
+                @Override
+                protected void updateItem(PeriodoAcademico item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null : item.getCodPeriodo() + " - " + item.getNombre());
+                }
+            });
+
+            // Sede selection
+            ComboBox<Sede> sedeCombo = new ComboBox<>();
+            sedeCombo.setItems(FXCollections.observableArrayList(sedes));
+            sedeCombo.setPromptText("Select sede");
+            sedeCombo.setButtonCell(new ListCell<Sede>() {
+                @Override
+                protected void updateItem(Sede item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null : item.getNombre());
+                }
+            });
+            sedeCombo.setCellFactory(lv -> new ListCell<Sede>() {
+                @Override
+                protected void updateItem(Sede item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null : item.getNombre());
+                }
+            });
+
+            TextField numeroGrupo = new TextField();
+            numeroGrupo.setPromptText("Group number (e.g., 1, 2, 3)");
+            TextField cupoMaximo = new TextField();
+            cupoMaximo.setPromptText("Maximum capacity (e.g., 30)");
+
+            grid.add(new Label("Course:"), 0, 0);
+            grid.add(courseCombo, 1, 0);
+            grid.add(new Label("Academic Period:"), 0, 1);
+            grid.add(periodoCombo, 1, 1);
+            grid.add(new Label("Sede:"), 0, 2);
+            grid.add(sedeCombo, 1, 2);
+            grid.add(new Label("Group Number:"), 0, 3);
+            grid.add(numeroGrupo, 1, 3);
+            grid.add(new Label("Maximum Capacity:"), 0, 4);
+            grid.add(cupoMaximo, 1, 4);
+
+            dialog.getDialogPane().setContent(grid);
+
+            dialog.setResultConverter(dialogButton -> {
+                if (dialogButton == addButtonType) {
+                    try {
+                        if (courseCombo.getValue() == null) {
+                            showAlert("Validation Error", "Please select a course.");
+                            return null;
+                        }
+                        if (periodoCombo.getValue() == null) {
+                            showAlert("Validation Error", "Please select an academic period.");
+                            return null;
+                        }
+                        if (sedeCombo.getValue() == null) {
+                            showAlert("Validation Error", "Please select a sede.");
+                            return null;
+                        }
+                        if (numeroGrupo.getText().trim().isEmpty()) {
+                            showAlert("Validation Error", "Please enter a group number.");
+                            return null;
+                        }
+                        if (cupoMaximo.getText().trim().isEmpty()) {
+                            showAlert("Validation Error", "Please enter maximum capacity.");
+                            return null;
+                        }
+
+                        int groupNumber = Integer.parseInt(numeroGrupo.getText().trim());
+                        int maxCapacity = Integer.parseInt(cupoMaximo.getText().trim());
+
+                        if (groupNumber < 1) {
+                            showAlert("Validation Error", "Group number must be positive.");
+                            return null;
+                        }
+                        if (maxCapacity < 1) {
+                            showAlert("Validation Error", "Maximum capacity must be positive.");
+                            return null;
+                        }
+
+                        Grupo created = academicService.createGrupo(
+                                groupNumber,
+                                maxCapacity,
+                                courseCombo.getValue().getCourseCode(),
+                                periodoCombo.getValue().getCodPeriodo(),
+                                sedeCombo.getValue().getIdSede()
+                        );
+                        return created;
+                    } catch (NumberFormatException nfe) {
+                        showAlert("Validation Error", "Please enter valid numeric values.");
+                        return null;
+                    } catch (Exception e) {
+                        logger.error("Error creating group", e);
+                        showAlert("Error", "Failed to create group: " + e.getMessage());
+                        return null;
+                    }
+                }
+                return null;
+            });
+
+            Optional<Grupo> result = dialog.showAndWait();
+            result.ifPresent(g -> {
+                showAlert("Success", "Group created successfully!");
+                loadGroups();
+            });
+
+        } catch (Exception e) {
+            logger.error("Error in handleAddGroup", e);
+            showAlert("Error", "An unexpected error occurred: " + e.getMessage());
+        }
+    }
+
+    @FXML
+    private void handleEditGroup() {
+        Grupo selected = groupTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showAlert("No Selection", "Please select a group to edit.");
+            return;
+        }
+
+        try {
+            List<Course> courses = academicService.getAllCourses();
+            List<PeriodoAcademico> periodos = academicService.getAllPeriodos();
+            List<Sede> sedes = academicService.getAllSedes();
+
+            Dialog<Grupo> dialog = new Dialog<>();
+            dialog.setTitle("Edit Group");
+            dialog.setHeaderText("Edit group information");
+
+            ButtonType saveButtonType = new ButtonType("Save", ButtonBar.ButtonData.OK_DONE);
+            dialog.getDialogPane().getButtonTypes().addAll(saveButtonType, ButtonType.CANCEL);
+
+            GridPane grid = new GridPane();
+            grid.setHgap(10);
+            grid.setVgap(10);
+            grid.setPadding(new Insets(20, 150, 10, 10));
+
+            // Course selection
+            ComboBox<Course> courseCombo = new ComboBox<>();
+            courseCombo.setItems(FXCollections.observableArrayList(courses));
+            // Find and set current course
+            for (Course c : courses) {
+                if (c.getCourseCode().equals(selected.getCodAsignatura())) {
+                    courseCombo.setValue(c);
+                    break;
+                }
+            }
+            courseCombo.setButtonCell(new ListCell<Course>() {
+                @Override
+                protected void updateItem(Course item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null : item.getCourseCode() + " - " + item.getCourseName());
+                }
+            });
+            courseCombo.setCellFactory(lv -> new ListCell<Course>() {
+                @Override
+                protected void updateItem(Course item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null : item.getCourseCode() + " - " + item.getCourseName());
+                }
+            });
+
+            // Period selection
+            ComboBox<PeriodoAcademico> periodoCombo = new ComboBox<>();
+            periodoCombo.setItems(FXCollections.observableArrayList(periodos));
+            // Find and set current period
+            for (PeriodoAcademico p : periodos) {
+                if (p.getCodPeriodo().equals(selected.getCodPeriodo())) {
+                    periodoCombo.setValue(p);
+                    break;
+                }
+            }
+            periodoCombo.setButtonCell(new ListCell<PeriodoAcademico>() {
+                @Override
+                protected void updateItem(PeriodoAcademico item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null : item.getCodPeriodo() + " - " + item.getNombre());
+                }
+            });
+            periodoCombo.setCellFactory(lv -> new ListCell<PeriodoAcademico>() {
+                @Override
+                protected void updateItem(PeriodoAcademico item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null : item.getCodPeriodo() + " - " + item.getNombre());
+                }
+            });
+
+            // Sede selection
+            ComboBox<Sede> sedeCombo = new ComboBox<>();
+            sedeCombo.setItems(FXCollections.observableArrayList(sedes));
+            // Find and set current sede
+            for (Sede s : sedes) {
+                if (s.getIdSede().equals(selected.getIdSede())) {
+                    sedeCombo.setValue(s);
+                    break;
+                }
+            }
+            sedeCombo.setButtonCell(new ListCell<Sede>() {
+                @Override
+                protected void updateItem(Sede item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null : item.getNombre());
+                }
+            });
+            sedeCombo.setCellFactory(lv -> new ListCell<Sede>() {
+                @Override
+                protected void updateItem(Sede item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null : item.getNombre());
+                }
+            });
+
+            TextField numeroGrupo = new TextField(selected.getNumeroGrupo().toString());
+            TextField cupoMaximo = new TextField(selected.getCupoMaximo().toString());
+
+            grid.add(new Label("Course:"), 0, 0);
+            grid.add(courseCombo, 1, 0);
+            grid.add(new Label("Academic Period:"), 0, 1);
+            grid.add(periodoCombo, 1, 1);
+            grid.add(new Label("Sede:"), 0, 2);
+            grid.add(sedeCombo, 1, 2);
+            grid.add(new Label("Group Number:"), 0, 3);
+            grid.add(numeroGrupo, 1, 3);
+            grid.add(new Label("Maximum Capacity:"), 0, 4);
+            grid.add(cupoMaximo, 1, 4);
+
+            dialog.getDialogPane().setContent(grid);
+
+            dialog.setResultConverter(dialogButton -> {
+                if (dialogButton == saveButtonType) {
+                    try {
+                        selected.setNumeroGrupo(Integer.parseInt(numeroGrupo.getText().trim()));
+                        selected.setCupoMaximo(Integer.parseInt(cupoMaximo.getText().trim()));
+                        if (courseCombo.getValue() != null) {
+                            selected.setCodAsignatura(courseCombo.getValue().getCourseCode());
+                        }
+                        if (periodoCombo.getValue() != null) {
+                            selected.setCodPeriodo(periodoCombo.getValue().getCodPeriodo());
+                        }
+                        if (sedeCombo.getValue() != null) {
+                            selected.setIdSede(sedeCombo.getValue().getIdSede());
+                        }
+
+                        academicService.updateGrupo(selected);
+                        return selected;
+                    } catch (NumberFormatException nfe) {
+                        showAlert("Validation Error", "Please enter valid numeric values.");
+                        return null;
+                    } catch (Exception e) {
+                        logger.error("Error updating group", e);
+                        showAlert("Error", "Failed to update group: " + e.getMessage());
+                        return null;
+                    }
+                }
+                return null;
+            });
+
+            Optional<Grupo> result = dialog.showAndWait();
+            result.ifPresent(g -> {
+                showAlert("Success", "Group updated successfully!");
+                loadGroups();
+            });
+
+        } catch (Exception e) {
+            logger.error("Error in handleEditGroup", e);
+            showAlert("Error", "An unexpected error occurred: " + e.getMessage());
+        }
+    }
+
+    @FXML
+    private void handleDeleteGroup() {
+        Grupo selected = groupTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showAlert("No Selection", "Please select a group to delete.");
+            return;
+        }
+
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        confirm.setTitle("Confirm Deletion");
+        confirm.setHeaderText("Delete Group");
+        confirm.setContentText("Are you sure you want to delete Group " + selected.getNumeroGrupo() +
+                " for " + (selected.getAsignatura() != null ? selected.getAsignatura().getNombre() : selected.getCodAsignatura()) + "?");
+
+        Optional<ButtonType> res = confirm.showAndWait();
+        if (res.isPresent() && res.get() == ButtonType.OK) {
+            try {
+                academicService.deleteGrupo(selected.getIdGrupo());
+                showAlert("Success", "Group deleted successfully!");
+                loadGroups();
+            } catch (Exception e) {
+                logger.error("Error deleting group", e);
+                showAlert("Error", "Failed to delete group: " + e.getMessage());
+            }
+        }
+    }
+
+    @FXML
+    private void handleViewGroupDetails() {
+        Grupo selected = groupTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showAlert("No Selection", "Please select a group to view details.");
+            return;
+        }
+
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("Group Details");
+        dialog.setHeaderText("Complete Group Information");
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+
+        GridPane grid = new GridPane();
+        grid.setHgap(15);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(20, 20, 20, 20));
+
+        int row = 0;
+        addDetailRow(grid, row++, "Group ID:", selected.getIdGrupo() != null ? selected.getIdGrupo().toString() : "N/A");
+        addDetailRow(grid, row++, "Group Number:", selected.getNumeroGrupo() != null ? selected.getNumeroGrupo().toString() : "N/A");
+        addDetailRow(grid, row++, "Course:", selected.getAsignatura() != null ?
+                selected.getAsignatura().getNombre() : selected.getCodAsignatura());
+        addDetailRow(grid, row++, "Course Code:", selected.getCodAsignatura());
+        addDetailRow(grid, row++, "Academic Period:", selected.getPeriodoAcademico() != null ?
+                selected.getPeriodoAcademico().getNombre() : selected.getCodPeriodo());
+        addDetailRow(grid, row++, "Sede:", selected.getSede() != null ?
+                selected.getSede().getNombre() : "N/A");
+        addDetailRow(grid, row++, "Maximum Capacity:", selected.getCupoMaximo() != null ? selected.getCupoMaximo().toString() : "0");
+        addDetailRow(grid, row++, "Enrolled Students:", selected.getCupoOcupado() != null ? selected.getCupoOcupado().toString() : "0");
+        addDetailRow(grid, row++, "Available Spots:", String.valueOf(selected.getCuposDisponibles()));
+        addDetailRow(grid, row++, "Status:", selected.isActivo() ? "Active" : "Inactive");
+
+        dialog.getDialogPane().setContent(grid);
+        dialog.getDialogPane().setPrefWidth(500);
+        dialog.showAndWait();
+    }
+
     private void showAlert(String title, String message) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle(title);
