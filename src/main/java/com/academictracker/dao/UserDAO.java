@@ -17,36 +17,51 @@ public class UserDAO {
     private static final Logger logger = LoggerFactory.getLogger(UserDAO.class);
 
     /**
-     * Create a new user
+     * Create a new user - requires manual ID
      */
     public User create(User user) throws SQLException {
-        String sql = "INSERT INTO UsuarioSistema (username, password_hash, rol, id_referencia, tipo_referencia, activo) VALUES (?, ?, ?, ?, ?, ?)";
+        // Get next available ID if not provided
+        if (user.getIdUsuario() == null) {
+            user.setIdUsuario(getNextId());
+        }
+
+        String sql = "INSERT INTO UsuarioSistema (id_usuario, username, password_hash, rol, id_referencia, tipo_referencia, activo) VALUES (?, ?, ?, ?, ?, ?, ?)";
 
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql, new String[]{"id_usuario"})) {
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-            stmt.setString(1, user.getUsername());
-            stmt.setString(2, user.getPasswordHash());
-            stmt.setString(3, user.getRol().getValue());
-            stmt.setString(4, user.getIdReferencia());
-            stmt.setString(5, user.getTipoReferencia());
-            stmt.setInt(6, user.isActivo() ? 1 : 0);
+            stmt.setLong(1, user.getIdUsuario());
+            stmt.setString(2, user.getUsername());
+            stmt.setString(3, user.getPasswordHash());
+            stmt.setString(4, user.getRol().getValue());
+            stmt.setString(5, user.getIdReferencia());
+            stmt.setString(6, user.getTipoReferencia());
+            stmt.setInt(7, user.isActivo() ? 1 : 0);
 
             int rowsAffected = stmt.executeUpdate();
             if (rowsAffected == 0) {
                 throw new SQLException("Creating user failed, no rows affected.");
             }
             
-            try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
-                if (generatedKeys.next()) {
-                    user.setIdUsuario(generatedKeys.getLong(1));
-                } else {
-                    throw new SQLException("Creating user failed, no ID obtained.");
-                }
-            }
-            
-            logger.info("User created successfully: {}", user.getUsername());
+            logger.info("User created successfully: {} with ID: {}", user.getUsername(), user.getIdUsuario());
             return user;
+        }
+    }
+
+    /**
+     * Get next available ID for manual assignment
+     */
+    private Long getNextId() throws SQLException {
+        String sql = "SELECT NVL(MAX(id_usuario), 0) + 1 FROM UsuarioSistema";
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
+            if (rs.next()) {
+                return rs.getLong(1);
+            }
+            return 1L;
         }
     }
 

@@ -1,5 +1,7 @@
 package com.academictracker.dao;
 
+import com.academictracker.model.Program;
+import com.academictracker.model.Sede;
 import com.academictracker.model.Student;
 import com.academictracker.util.DatabaseConnection;
 import org.slf4j.Logger;
@@ -177,14 +179,22 @@ public class StudentDAO {
 
             stmt.setString(1, codEstudiante);
 
+            logger.info("Attempting to deactivate student with code: {}", codEstudiante);
+
             int rowsAffected = stmt.executeUpdate();
+            logger.info("Rows affected by delete operation: {}", rowsAffected);
+
             if (rowsAffected > 0) {
                 logger.info("Student deactivated successfully: {}", codEstudiante);
                 return true;
+            } else {
+                logger.warn("No student found with code: {}", codEstudiante);
+                return false;
             }
+        } catch (SQLException e) {
+            logger.error("SQL Error during student delete: {}", e.getMessage());
+            throw e;
         }
-
-        return false;
     }
 
     // Legacy method for compatibility
@@ -229,6 +239,34 @@ public class StudentDAO {
         student.setCodPrograma(rs.getLong("cod_programa"));
         student.setIdSede(rs.getLong("id_sede"));
         student.setActivo(rs.getInt("activo") == 1);
+
+        // Map Program object from JOIN
+        try {
+            String programaNombre = rs.getString("programa_nombre");
+            if (programaNombre != null) {
+                Program program = new Program();
+                program.setCodPrograma(rs.getLong("cod_programa"));
+                program.setNombre(programaNombre);
+                student.setPrograma(program);
+            }
+        } catch (SQLException e) {
+            // Column might not exist if not joined
+            logger.debug("programa_nombre column not found in result set");
+        }
+
+        // Map Sede object from JOIN
+        try {
+            String sedeNombre = rs.getString("sede_nombre");
+            if (sedeNombre != null) {
+                Sede sede = new Sede();
+                sede.setIdSede(rs.getLong("id_sede"));
+                sede.setNombre(sedeNombre);
+                student.setSede(sede);
+            }
+        } catch (SQLException e) {
+            // Column might not exist if not joined
+            logger.debug("sede_nombre column not found in result set");
+        }
 
         return student;
     }

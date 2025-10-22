@@ -23,6 +23,7 @@ public class AcademicService {
     private final CourseDAO courseDAO;
     private final EnrollmentDAO enrollmentDAO;
     private final GradeDAO gradeDAO;
+    private final SedeDAO sedeDAO;
 
     public AcademicService() {
         this.studentDAO = new StudentDAO();
@@ -31,10 +32,55 @@ public class AcademicService {
         this.courseDAO = new CourseDAO();
         this.enrollmentDAO = new EnrollmentDAO();
         this.gradeDAO = new GradeDAO();
+        this.sedeDAO = new SedeDAO();
     }
 
     // ==================== Student Operations ====================
     
+    /**
+     * Add a new student to the system
+     */
+    public Student addStudent(Student student) throws Exception {
+        // Validate required fields
+        if (student.getCodEstudiante() == null || student.getCodEstudiante().trim().isEmpty()) {
+            throw new IllegalArgumentException("Student code is required");
+        }
+
+        if (student.getNumeroDocumento() == null || student.getNumeroDocumento().trim().isEmpty()) {
+            throw new IllegalArgumentException("Document number is required");
+        }
+
+        if (!ValidationUtil.isNotEmpty(student.getNombres()) || !ValidationUtil.isNotEmpty(student.getApellidos())) {
+            throw new IllegalArgumentException("Names and last names are required");
+        }
+
+        if (!ValidationUtil.isNotEmpty(student.getCorreoInstitucional())) {
+            throw new IllegalArgumentException("Institutional email is required");
+        }
+
+        if (student.getCodPrograma() == null) {
+            throw new IllegalArgumentException("Program is required");
+        }
+
+        if (student.getIdSede() == null) {
+            throw new IllegalArgumentException("Sede is required");
+        }
+
+        // Check if student code already exists
+        Optional<Student> existing = studentDAO.findById(student.getCodEstudiante());
+        if (existing.isPresent()) {
+            throw new IllegalArgumentException("Student with this code already exists");
+        }
+
+        // Check if document number already exists
+        Optional<Student> existingByDoc = studentDAO.findByDocumento(student.getNumeroDocumento());
+        if (existingByDoc.isPresent()) {
+            throw new IllegalArgumentException("Student with this document number already exists");
+        }
+
+        return studentDAO.create(student);
+    }
+
     public Student createStudent(String codEstudiante, String numeroDocumento, String tipoDocumento,
                                 String nombres, String apellidos, String correoInstitucional,
                                 LocalDate fechaIngreso, Long codPrograma, Long idSede) throws Exception {
@@ -386,5 +432,18 @@ public class AcademicService {
             .anyMatch(e -> e.getCourseId() != null &&
                           e.getCourseId().equals(courseId) &&
                           e.getStatus() == Enrollment.EnrollmentStatus.ACTIVE);
+    }
+
+    // ==================== Sede Operations ====================
+
+    /**
+     * Get all sedes
+     */
+    public List<Sede> getAllSedes() throws SQLException {
+        return sedeDAO.findAll();
+    }
+
+    public Optional<Sede> getSedeById(Long idSede) throws SQLException {
+        return sedeDAO.findById(idSede);
     }
 }

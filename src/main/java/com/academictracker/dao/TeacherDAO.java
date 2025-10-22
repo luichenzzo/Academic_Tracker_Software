@@ -17,35 +17,50 @@ public class TeacherDAO {
     private static final Logger logger = LoggerFactory.getLogger(TeacherDAO.class);
 
     public Teacher create(Teacher teacher) throws SQLException {
-        String sql = "INSERT INTO Docente (numero_documento, tipo_documento, nombres, apellidos, correo_institucional, telefono, horas_asignadas, activo) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        // Get next available ID if not provided
+        if (teacher.getIdDocente() == null) {
+            teacher.setIdDocente(getNextId());
+        }
+
+        String sql = "INSERT INTO Docente (id_docente, numero_documento, tipo_documento, nombres, apellidos, correo_institucional, telefono, horas_asignadas, activo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql, new String[]{"id_docente"})) {
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-            stmt.setString(1, teacher.getNumeroDocumento());
-            stmt.setString(2, teacher.getTipoDocumento() != null ? teacher.getTipoDocumento() : "CC");
-            stmt.setString(3, teacher.getNombres());
-            stmt.setString(4, teacher.getApellidos());
-            stmt.setString(5, teacher.getCorreoInstitucional());
-            stmt.setString(6, teacher.getTelefono());
-            stmt.setBigDecimal(7, teacher.getHorasAsignadas());
-            stmt.setInt(8, teacher.isActivo() ? 1 : 0);
+            stmt.setLong(1, teacher.getIdDocente());
+            stmt.setString(2, teacher.getNumeroDocumento());
+            stmt.setString(3, teacher.getTipoDocumento() != null ? teacher.getTipoDocumento() : "CC");
+            stmt.setString(4, teacher.getNombres());
+            stmt.setString(5, teacher.getApellidos());
+            stmt.setString(6, teacher.getCorreoInstitucional());
+            stmt.setString(7, teacher.getTelefono());
+            stmt.setBigDecimal(8, teacher.getHorasAsignadas());
+            stmt.setInt(9, teacher.isActivo() ? 1 : 0);
 
             int rowsAffected = stmt.executeUpdate();
             if (rowsAffected == 0) {
                 throw new SQLException("Creating teacher failed, no rows affected.");
             }
 
-            try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
-                if (generatedKeys.next()) {
-                    teacher.setIdDocente(generatedKeys.getLong(1));
-                } else {
-                    throw new SQLException("Creating teacher failed, no ID obtained.");
-                }
-            }
-            
-            logger.info("Teacher created: {} {}", teacher.getNombres(), teacher.getApellidos());
+            logger.info("Teacher created: {} {} with ID: {}", teacher.getNombres(), teacher.getApellidos(), teacher.getIdDocente());
             return teacher;
+        }
+    }
+
+    /**
+     * Get next available ID for manual assignment
+     */
+    private Long getNextId() throws SQLException {
+        String sql = "SELECT NVL(MAX(id_docente), 0) + 1 FROM Docente";
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
+            if (rs.next()) {
+                return rs.getLong(1);
+            }
+            return 1L;
         }
     }
 

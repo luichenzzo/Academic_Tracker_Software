@@ -17,6 +17,11 @@ public class ProgramDAO {
     private static final Logger logger = LoggerFactory.getLogger(ProgramDAO.class);
 
     public Program create(Program program) throws SQLException {
+        // Assign next ID if not provided (manual PK similar to other DAOs)
+        if (program.getCodPrograma() == null) {
+            program.setCodPrograma(getNextId());
+        }
+
         String sql = "INSERT INTO ProgramaAcademico (cod_programa, codigo_programa, nombre, creditos_totales, duracion_semestres, id_tipo_programa, id_facultad) VALUES (?, ?, ?, ?, ?, ?, ?)";
 
         try (Connection conn = DatabaseConnection.getConnection();
@@ -35,8 +40,25 @@ public class ProgramDAO {
                 throw new SQLException("Creating program failed, no rows affected.");
             }
             
-            logger.info("Program created: {}", program.getNombre());
+            logger.info("Program created: {} (cod={})", program.getNombre(), program.getCodPrograma());
             return program;
+        }
+    }
+
+    /**
+     * Get next available ID for manual assignment
+     */
+    private Long getNextId() throws SQLException {
+        String sql = "SELECT NVL(MAX(cod_programa), 0) + 1 FROM ProgramaAcademico";
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
+            if (rs.next()) {
+                return rs.getLong(1);
+            }
+            return 1L;
         }
     }
 
@@ -176,21 +198,33 @@ public class ProgramDAO {
     private Program mapResultSetToProgram(ResultSet rs) throws SQLException {
         Program program = new Program();
 
-        program.setCodPrograma(rs.getLong("cod_programa"));
-        program.setCodigoPrograma(rs.getString("codigo_programa"));
-        program.setNombre(rs.getString("nombre"));
-        program.setCreditosTotales(rs.getInt("creditos_totales"));
-        program.setDuracionSemestres(rs.getInt("duracion_semestres"));
-        program.setIdTipoPrograma(rs.getLong("id_tipo_programa"));
-        program.setIdFacultad(rs.getLong("id_facultad"));
+        try {
+            program.setCodPrograma(rs.getLong("cod_programa"));
+            program.setCodigoPrograma(rs.getString("codigo_programa"));
+            program.setNombre(rs.getString("nombre"));
+            program.setCreditosTotales(rs.getInt("creditos_totales"));
+            program.setDuracionSemestres(rs.getInt("duracion_semestres"));
+            program.setIdTipoPrograma(rs.getLong("id_tipo_programa"));
+            program.setIdFacultad(rs.getLong("id_facultad"));
 
-        // Legacy compatibility fields
-        program.setProgramId(rs.getLong("cod_programa"));
-        program.setProgramCode(rs.getString("codigo_programa"));
-        program.setProgramName(rs.getString("nombre"));
-        program.setDescription(rs.getString("tipo_programa"));
-        program.setDurationYears(rs.getInt("duracion_semestres") / 2); // Convert semesters to years
-        program.setCreditsRequired(rs.getInt("creditos_totales"));
+            // Legacy compatibility fields
+            program.setProgramId(rs.getLong("cod_programa"));
+            program.setProgramCode(rs.getString("codigo_programa"));
+            program.setProgramName(rs.getString("nombre"));
+
+            // Safely handle potentially null tipo_programa from LEFT JOIN
+            String tipoPrograma = rs.getString("tipo_programa");
+            program.setDescription(tipoPrograma != null ? tipoPrograma : "");
+
+            program.setDurationYears(rs.getInt("duracion_semestres") / 2); // Convert semesters to years
+            program.setCreditsRequired(rs.getInt("creditos_totales"));
+
+            logger.trace("Mapped program: cod={}, codigo={}, nombre={}",
+                program.getCodPrograma(), program.getCodigoPrograma(), program.getNombre());
+        } catch (SQLException e) {
+            logger.error("Error mapping ResultSet to Program: {}", e.getMessage());
+            throw e;
+        }
 
         return program;
     }

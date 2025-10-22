@@ -40,19 +40,26 @@
             <Tab text="Students">
                 <VBox spacing="10" style="-fx-padding: 15;">
                     <HBox spacing="10" alignment="CENTER_LEFT">
-                        <Button text="Add Student" styleClass="primary-button"/>
-                        <Button text="Edit Student" styleClass="secondary-button"/>
-                        <Button text="Delete Student" styleClass="danger-button"/>
-                        <Button text="View Details"/>
+                         <Button text="Add Student" styleClass="primary-button" onAction="#handleAddStudent"/>
+                        <Button text="Edit Student" styleClass="secondary-button" onAction="#handleEditStudent"/>
+                        <Button text="Delete Student" styleClass="danger-button" onAction="#handleDeleteStudent"/>
+                        <Button text="View Details" onAction="#handleViewStudentDetails"/>
                     </HBox>
                     
                     <TableView fx:id="studentTable" VBox.vgrow="ALWAYS">
                         <columns>
-                            <TableColumn fx:id="studentIdColumn" text="ID" prefWidth="80"/>
-                            <TableColumn fx:id="studentFirstNameColumn" text="First Name" prefWidth="150"/>
-                            <TableColumn fx:id="studentLastNameColumn" text="Last Name" prefWidth="150"/>
-                            <TableColumn fx:id="studentPhoneColumn" text="Phone" prefWidth="150"/>
+                            <TableColumn fx:id="studentIdColumn" text="Code" prefWidth="80"/>
+                            <TableColumn fx:id="studentFirstNameColumn" text="Names" prefWidth="120"/>
+                            <TableColumn fx:id="studentLastNameColumn" text="Last Names" prefWidth="120"/>
+                            <TableColumn fx:id="studentDocumentColumn" text="Document" prefWidth="100"/>
+                            <TableColumn fx:id="studentEmailColumn" text="Email" prefWidth="200"/>
+                            <TableColumn fx:id="studentProgramColumn" text="Program" prefWidth="180"/>
+                            <TableColumn fx:id="studentSedeColumn" text="Sede" prefWidth="120"/>
+                            <TableColumn fx:id="studentRiesgoColumn" text="Risk" prefWidth="60"/>
                         </columns>
+                        <placeholder>
+                            <Label text="No students found. Click 'Add Student' to add a new student." style="-fx-text-fill: gray;"/>
+                        </placeholder>
                     </TableView>
                 </VBox>
             </Tab>
@@ -61,10 +68,10 @@
             <Tab text="Teachers">
                 <VBox spacing="10" style="-fx-padding: 15;">
                     <HBox spacing="10" alignment="CENTER_LEFT">
-                        <Button text="Add Teacher" styleClass="primary-button"/>
-                        <Button text="Edit Teacher" styleClass="secondary-button"/>
-                        <Button text="Delete Teacher" styleClass="danger-button"/>
-                        <Button text="View Details"/>
+                        <Button text="Add Teacher" styleClass="primary-button" onAction="#handleAddTeacher"/>
+                        <Button text="Edit Teacher" styleClass="secondary-button" onAction="#handleEditTeacher"/>
+                        <Button text="Delete Teacher" styleClass="danger-button" onAction="#handleDeleteTeacher"/>
+                        <Button text="View Details" onAction="#handleViewTeacherDetails"/>
                     </HBox>
                     
                     <TableView fx:id="teacherTable" VBox.vgrow="ALWAYS">
@@ -82,9 +89,10 @@
             <Tab text="Programs">
                 <VBox spacing="10" style="-fx-padding: 15;">
                     <HBox spacing="10" alignment="CENTER_LEFT">
-                        <Button text="Add Program" styleClass="primary-button"/>
-                        <Button text="Edit Program" styleClass="secondary-button"/>
-                        <Button text="Delete Program" styleClass="danger-button"/>
+                        <Button text="Add Program" styleClass="primary-button" onAction="#handleAddProgram"/>
+                        <Button text="Edit Program" styleClass="secondary-button" onAction="#handleEditProgram"/>
+                        <Button text="Delete Program" styleClass="danger-button" onAction="#handleDeleteProgram"/>
+                        <Button text="View Details" onAction="#handleViewProgramDetails"/>
                     </HBox>
                     
                     <TableView fx:id="programTable" VBox.vgrow="ALWAYS">

@@ -17,34 +17,49 @@ public class SedeDAO {
     private static final Logger logger = LoggerFactory.getLogger(SedeDAO.class);
 
     /**
-     * Create a new sede
+     * Create a new sede - requires manual ID
      */
     public Sede create(Sede sede) throws SQLException {
-        String sql = "INSERT INTO Sede (nombre, municipio, direccion, telefono) VALUES (?, ?, ?, ?)";
+        // Get next available ID
+        if (sede.getIdSede() == null) {
+            sede.setIdSede(getNextId());
+        }
+
+        String sql = "INSERT INTO Sede (id_sede, nombre, municipio, direccion, telefono) VALUES (?, ?, ?, ?, ?)";
 
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql, new String[]{"id_sede"})) {
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-            stmt.setString(1, sede.getNombre());
-            stmt.setString(2, sede.getMunicipio());
-            stmt.setString(3, sede.getDireccion());
-            stmt.setString(4, sede.getTelefono());
+            stmt.setLong(1, sede.getIdSede());
+            stmt.setString(2, sede.getNombre());
+            stmt.setString(3, sede.getMunicipio());
+            stmt.setString(4, sede.getDireccion());
+            stmt.setString(5, sede.getTelefono());
 
             int rowsAffected = stmt.executeUpdate();
             if (rowsAffected == 0) {
                 throw new SQLException("Creating sede failed, no rows affected.");
             }
 
-            try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
-                if (generatedKeys.next()) {
-                    sede.setIdSede(generatedKeys.getLong(1));
-                } else {
-                    throw new SQLException("Creating sede failed, no ID obtained.");
-                }
-            }
-
-            logger.info("Sede created successfully: {}", sede.getNombre());
+            logger.info("Sede created successfully: {} with ID: {}", sede.getNombre(), sede.getIdSede());
             return sede;
+        }
+    }
+
+    /**
+     * Get next available ID for manual assignment
+     */
+    private Long getNextId() throws SQLException {
+        String sql = "SELECT NVL(MAX(id_sede), 0) + 1 FROM Sede";
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
+            if (rs.next()) {
+                return rs.getLong(1);
+            }
+            return 1L;
         }
     }
 
