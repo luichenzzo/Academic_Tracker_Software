@@ -424,6 +424,16 @@ public class GradeDAO {
         if (!rs.wasNull()) {
             g.setGradedBy(gradedBy);
         }
+        // set rule id if present
+        long ruleId = rs.getLong("id_regla");
+        if (!rs.wasNull()) {
+            g.setRuleId(ruleId);
+        }
+        // set registration timestamp
+        java.sql.Timestamp ts = rs.getTimestamp("fecha_registro");
+        if (ts != null) {
+            g.setRegisteredAt(ts);
+        }
         return g;
     }
 

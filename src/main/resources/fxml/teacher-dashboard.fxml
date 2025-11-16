@@ -56,7 +56,39 @@
             <Tab text="Students">
                 <VBox spacing="10" style="-fx-padding: 15;">
                     <Label text="Students enrolled in your courses" style="-fx-font-size: 16px;"/>
-                    <Label text="(Coming soon)" style="-fx-text-fill: gray;"/>
+
+                    <HBox spacing="10">
+                        <Label text="Use group selector in the Grades tab" />
+                        <Button text="Refresh Students" onAction="#handleRefreshStudents" />
+                    </HBox>
+
+                    <SplitPane prefHeight="400">
+                        <items>
+                            <TableView fx:id="studentsTable" prefWidth="450">
+                                <columns>
+                                    <TableColumn fx:id="studentTableIdCol" text="Student ID" prefWidth="120" />
+                                    <TableColumn fx:id="studentTableNameCol" text="Student Name" prefWidth="280" />
+                                </columns>
+                                <placeholder>
+                                    <Label text="Select a group to load students" style="-fx-text-fill: gray;"/>
+                                </placeholder>
+                            </TableView>
+
+                            <TableView fx:id="studentGradesTable" prefWidth="520">
+                                <columns>
+                                    <TableColumn fx:id="gradeIdCol" text="Grade ID" prefWidth="80" />
+                                    <TableColumn fx:id="gradeValueCol" text="Value" prefWidth="80" />
+                                    <TableColumn fx:id="gradeRuleCol" text="Rule ID" prefWidth="80" />
+                                    <TableColumn fx:id="gradeDateCol" text="Date" prefWidth="180" />
+                                    <TableColumn fx:id="gradeByCol" text="By (Docente)" prefWidth="100" />
+                                </columns>
+                                <placeholder>
+                                    <Label text="Select a student to view their grade history" style="-fx-text-fill: gray;"/>
+                                </placeholder>
+                            </TableView>
+                        </items>
+                    </SplitPane>
+
                 </VBox>
             </Tab>
             

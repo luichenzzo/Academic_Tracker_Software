@@ -1,11 +1,15 @@
 package com.academictracker.model;
 
+import java.sql.Timestamp;
+
 public class Grade {
     private Long gradeId;
     private Long enrollmentId;
     private Double gradeValue;
     private String comments;
     private Long gradedBy;
+    private Long ruleId; // id_regla from Calificacion
+    private Timestamp registeredAt; // fecha_registro from Calificacion
 
     public Grade() {
     }
@@ -56,5 +60,21 @@ public class Grade {
 
     public void setGradedBy(Long gradedBy) {
         this.gradedBy = gradedBy;
+    }
+
+    public Long getRuleId() {
+        return ruleId;
+    }
+
+    public void setRuleId(Long ruleId) {
+        this.ruleId = ruleId;
+    }
+
+    public Timestamp getRegisteredAt() {
+        return registeredAt;
+    }
+
+    public void setRegisteredAt(Timestamp registeredAt) {
+        this.registeredAt = registeredAt;
     }
 }

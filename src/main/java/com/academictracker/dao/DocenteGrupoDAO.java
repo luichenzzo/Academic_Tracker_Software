@@ -212,6 +212,33 @@ public class DocenteGrupoDAO {
         return groups;
     }
 
+    /**
+     * Get all students for a group
+     */
+    public List<StudentRow> getStudentsForGroup(Long idGrupo) throws SQLException {
+        String sql = "SELECT dm.id_detalle, e.cod_estudiante, (e.nombres || ' ' || e.apellidos) AS full_name " +
+                     "FROM DetalleMatricula dm " +
+                     "JOIN Matricula m ON dm.id_matricula = m.id_matricula " +
+                     "JOIN Estudiante e ON m.cod_estudiante = e.cod_estudiante " +
+                     "WHERE dm.id_grupo = ? ORDER BY e.apellidos, e.nombres";
+
+        List<StudentRow> list = new ArrayList<>();
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, idGrupo);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    StudentRow r = new StudentRow();
+                    r.enrollmentId = rs.getLong("id_detalle");
+                    r.studentId = rs.getString("cod_estudiante");
+                    r.fullName = rs.getString("full_name");
+                    list.add(r);
+                }
+            }
+        }
+        return list;
+    }
+
     public static class TeacherGroupAssignment {
         public Long idDocente;
         public String nombres;
@@ -246,5 +273,15 @@ public class DocenteGrupoDAO {
         public int getAvailableSpots() {
             return cupoMaximo - cupoOcupado;
         }
+    }
+
+    public static class StudentRow {
+        public Long enrollmentId;
+        public String studentId;
+        public String fullName;
+
+        public String getStudentId() { return studentId; }
+        public String getFullName() { return fullName; }
+        public Long getEnrollmentId() { return enrollmentId; }
     }
 }

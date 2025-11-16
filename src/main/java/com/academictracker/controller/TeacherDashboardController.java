@@ -79,6 +79,36 @@ public class TeacherDashboardController {
     @FXML
     private javafx.scene.control.ComboBox<DocenteGrupoDAO.GroupAssignmentDetails> groupCombo;
 
+    @FXML
+    private TableView<DocenteGrupoDAO.StudentRow> studentsTable;
+
+    @FXML
+    private TableColumn<DocenteGrupoDAO.StudentRow, String> studentTableIdCol;
+
+    @FXML
+    private TableColumn<DocenteGrupoDAO.StudentRow, String> studentTableNameCol;
+
+    @FXML
+    private TableView<com.academictracker.model.Grade> studentGradesTable;
+
+    @FXML
+    private TableColumn<com.academictracker.model.Grade, String> gradeIdCol;
+
+    @FXML
+    private TableColumn<com.academictracker.model.Grade, String> gradeValueCol;
+
+    @FXML
+    private TableColumn<com.academictracker.model.Grade, String> gradeRuleCol;
+
+    @FXML
+    private TableColumn<com.academictracker.model.Grade, String> gradeDateCol;
+
+    @FXML
+    private TableColumn<com.academictracker.model.Grade, String> gradeByCol;
+
+    @FXML
+    private javafx.scene.control.Button registerGradeButton;
+
     private final DocenteGrupoDAO docenteGrupoDAO;
     private final GradeDAO gradeDAO = new GradeDAO();
     private Long currentTeacherId;
@@ -174,6 +204,24 @@ public class TeacherDashboardController {
 
         statusColumn.setCellValueFactory(cellData ->
             new SimpleStringProperty(cellData.getValue().getStatus()));
+
+        // Students table columns
+        studentTableIdCol.setCellValueFactory(cellData ->
+            new SimpleStringProperty(cellData.getValue().getStudentId()));
+        studentTableNameCol.setCellValueFactory(cellData ->
+            new SimpleStringProperty(cellData.getValue().getFullName()));
+
+        // Student grades table columns
+        gradeIdCol.setCellValueFactory(cellData ->
+            new SimpleStringProperty(cellData.getValue().getGradeId() != null ? cellData.getValue().getGradeId().toString() : ""));
+        gradeValueCol.setCellValueFactory(cellData ->
+            new SimpleStringProperty(cellData.getValue().getGradeValue() != null ? String.format("%.2f", cellData.getValue().getGradeValue()) : ""));
+        gradeRuleCol.setCellValueFactory(cellData ->
+            new SimpleStringProperty(cellData.getValue().getRuleId() != null ? cellData.getValue().getRuleId().toString() : ""));
+        gradeDateCol.setCellValueFactory(cellData ->
+            new SimpleStringProperty(cellData.getValue().getRegisteredAt() != null ? cellData.getValue().getRegisteredAt().toString() : ""));
+        gradeByCol.setCellValueFactory(cellData ->
+            new SimpleStringProperty(cellData.getValue().getGradedBy() != null ? cellData.getValue().getGradedBy().toString() : ""));
     }
 
     private void setupGroupCombo() {
@@ -219,6 +267,41 @@ public class TeacherDashboardController {
         }
     }
 
+    // New: load students for selected group (by group id)
+    private void loadStudentsForGroup(DocenteGrupoDAO.GroupAssignmentDetails group) {
+        if (group == null) {
+            studentsTable.getItems().clear();
+            studentGradesTable.getItems().clear();
+            return;
+        }
+
+        try {
+            List<DocenteGrupoDAO.StudentRow> students = docenteGrupoDAO.getStudentsForGroup(group.idGrupo);
+            ObservableList<DocenteGrupoDAO.StudentRow> list = FXCollections.observableArrayList(students);
+            studentsTable.setItems(list);
+
+            // When a student is selected, load their grade history
+            studentsTable.getSelectionModel().selectedItemProperty().addListener((obs, oldS, newS) -> {
+                if (newS != null) {
+                    try {
+                        List<com.academictracker.model.Grade> grades = gradeDAO.findByEnrollment(newS.getEnrollmentId());
+                        ObservableList<com.academictracker.model.Grade> gList = FXCollections.observableArrayList(grades);
+                        studentGradesTable.setItems(gList);
+                    } catch (SQLException e) {
+                        logger.error("Error loading student grades", e);
+                        showAlert("Error", "No se pudieron cargar las calificaciones del estudiante: " + e.getMessage());
+                    }
+                } else {
+                    studentGradesTable.getItems().clear();
+                }
+            });
+
+        } catch (SQLException e) {
+            logger.error("Error loading students for group", e);
+            showAlert("Error", "No se pudieron cargar los estudiantes del grupo: " + e.getMessage());
+        }
+    }
+
     // New: load grades for a selected group (courseCode + groupNumber)
     private void loadGradesForGroup(String courseCode, Integer groupNumber) {
         try {
@@ -226,6 +309,13 @@ public class TeacherDashboardController {
             ObservableList<GradeDisplay> gradesList = FXCollections.observableArrayList(grades);
             gradesTable.setItems(gradesList);
             logger.info("Loaded {} grades for group {} - {}", grades.size(), courseCode, groupNumber);
+
+            // Also load students for this group (synchronize left Students tab)
+            // find the currently selected GroupAssignmentDetails in groupCombo/table
+            DocenteGrupoDAO.GroupAssignmentDetails currentGroup = groupCombo.getSelectionModel().getSelectedItem();
+            if (currentGroup != null) {
+                loadStudentsForGroup(currentGroup);
+            }
         } catch (Exception e) {
             logger.error("Error loading grades for group", e);
             showAlert("Error", "Failed to load grades: " + e.getMessage());
@@ -362,5 +452,11 @@ public class TeacherDashboardController {
                 showAlert("Error", "No se pudo registrar la nota: " + e.getMessage());
             }
         });
+    }
+
+    @FXML
+    public void handleRefreshStudents() {
+        DocenteGrupoDAO.GroupAssignmentDetails group = groupCombo.getSelectionModel().getSelectedItem();
+        loadStudentsForGroup(group);
     }
 }
