@@ -65,7 +65,10 @@
                     <Label text="Manage student grades" style="-fx-font-size: 16px;"/>
 
                     <!-- Group selector combo added -->
-                    <ComboBox fx:id="groupCombo" promptText="Select group" prefWidth="600"/>
+                    <HBox spacing="10">
+                        <ComboBox fx:id="groupCombo" promptText="Select group" prefWidth="520"/>
+                        <Button fx:id="registerGradeButton" text="Registrar nota" onAction="#handleRegisterGrade" />
+                    </HBox>
 
                     <!-- Grades table added -->
                     <TableView fx:id="gradesTable" VBox.vgrow="ALWAYS">

@@ -28,7 +28,7 @@ public class GradeDAO {
     public List<GradeDisplay> getGradesForGroup(String courseCode, Integer groupNumber) throws SQLException {
         List<GradeDisplay> result = new ArrayList<>();
 
-        String sql = "SELECT e.cod_estudiante AS student_id, (e.nombres || ' ' || e.apellidos) AS student_name, nd.nota_definitiva AS grade_value " +
+        String sql = "SELECT e.cod_estudiante AS student_id, (e.nombres || ' ' || e.apellidos) AS student_name, nd.nota_definitiva AS grade_value, dm.id_detalle AS enrollment_id " +
                 "FROM Grupo g " +
                 "JOIN DetalleMatricula dm ON dm.id_grupo = g.id_grupo " +
                 "JOIN Matricula m ON m.id_matricula = dm.id_matricula " +
@@ -58,6 +58,9 @@ public class GradeDAO {
                         gradeVal = rs.getDouble("grade_value");
                     }
 
+                    Long enrollmentId = rs.getLong("enrollment_id");
+                    if (rs.wasNull()) enrollmentId = null;
+
                     String gradeStr = gradeVal != null ? String.format("%.2f", gradeVal) : "N/A";
                     String status;
                     if (gradeVal == null) {
@@ -68,7 +71,7 @@ public class GradeDAO {
                         status = "Reprobado";
                     }
 
-                    result.add(new GradeDisplay(studentId, studentName, gradeStr, status));
+                    result.add(new GradeDisplay(studentId, studentName, gradeStr, status, enrollmentId));
                 }
             }
         }
@@ -79,34 +82,55 @@ public class GradeDAO {
     // ---------------- Domain CRUD for Grade (Calificacion) ----------------
 
     public Grade create(Grade grade) throws SQLException {
-        String getMaxSql = "SELECT NVL(MAX(id_calificacion), 0) + 1 AS next_id FROM Calificacion";
-        String insertSql = "INSERT INTO Calificacion (id_calificacion, id_detalle, id_regla, nota, fecha_registro, id_docente_registra) VALUES (?, ?, ?, ?, ?, ?)";
+        // Instead of inserting into Calificacion (which requires a non-null id_regla),
+        // store the value in NotaDefinitiva (one per detalle) — insert or update.
+        if (grade.getEnrollmentId() == null) {
+            throw new SQLException("Enrollment id (id_detalle) is required to create a grade");
+        }
 
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement getMaxStmt = conn.prepareStatement(getMaxSql);
-             ResultSet rs = getMaxStmt.executeQuery()) {
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            // Check if a NotaDefinitiva already exists for this enrollment (id_detalle)
+            String findSql = "SELECT id_nota_definitiva FROM NotaDefinitiva WHERE id_detalle = ?";
+            try (PreparedStatement psFind = conn.prepareStatement(findSql)) {
+                psFind.setLong(1, grade.getEnrollmentId());
+                try (ResultSet rs = psFind.executeQuery()) {
+                    if (rs.next()) {
+                        long existingId = rs.getLong("id_nota_definitiva");
+                        String updateSql = "UPDATE NotaDefinitiva SET nota_definitiva = ?, fecha_calculo = CURRENT_TIMESTAMP WHERE id_nota_definitiva = ?";
+                        try (PreparedStatement psUpd = conn.prepareStatement(updateSql)) {
+                            psUpd.setDouble(1, grade.getGradeValue() != null ? grade.getGradeValue() : 0.0);
+                            psUpd.setLong(2, existingId);
+                            int updated = psUpd.executeUpdate();
+                            if (updated == 0) {
+                                throw new SQLException("Updating NotaDefinitiva failed, no rows affected.");
+                            }
+                        }
 
-            long nextId = 1;
-            if (rs.next()) {
-                nextId = rs.getLong("next_id");
+                        grade.setGradeId(existingId);
+                        return grade;
+                    }
+                }
             }
 
-            try (PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {
-                insertStmt.setLong(1, nextId);
-                insertStmt.setLong(2, grade.getEnrollmentId() != null ? grade.getEnrollmentId() : 0);
-                // id_regla is optional; store NULL
-                insertStmt.setNull(3, java.sql.Types.BIGINT);
-                insertStmt.setDouble(4, grade.getGradeValue() != null ? grade.getGradeValue() : 0.0);
-                insertStmt.setTimestamp(5, new Timestamp(System.currentTimeMillis()));
-                if (grade.getGradedBy() != null) {
-                    insertStmt.setLong(6, grade.getGradedBy());
-                } else {
-                    insertStmt.setNull(6, java.sql.Types.BIGINT);
+            // Insert new NotaDefinitiva
+            String getMaxSql = "SELECT NVL(MAX(id_nota_definitiva), 0) + 1 AS next_id FROM NotaDefinitiva";
+            long nextId = 1;
+            try (PreparedStatement psMax = conn.prepareStatement(getMaxSql);
+                 ResultSet rsMax = psMax.executeQuery()) {
+                if (rsMax.next()) {
+                    nextId = rsMax.getLong("next_id");
                 }
+            }
 
-                int rows = insertStmt.executeUpdate();
+            String insertSql = "INSERT INTO NotaDefinitiva (id_nota_definitiva, id_detalle, nota_definitiva, fecha_calculo, cerrada) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0)";
+            try (PreparedStatement psIns = conn.prepareStatement(insertSql)) {
+                psIns.setLong(1, nextId);
+                psIns.setLong(2, grade.getEnrollmentId());
+                psIns.setDouble(3, grade.getGradeValue() != null ? grade.getGradeValue() : 0.0);
+
+                int rows = psIns.executeUpdate();
                 if (rows == 0) {
-                    throw new SQLException("Creating grade failed, no rows affected.");
+                    throw new SQLException("Creating NotaDefinitiva failed, no rows affected.");
                 }
 
                 grade.setGradeId(nextId);

@@ -105,10 +105,9 @@ public class TeacherDashboardController {
                 // When a group is selected in the table, load its grades
                 groupsTable.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, newSelection) -> {
                     if (newSelection != null) {
-                        // Use course code and group number to identify group (adjust if you have a dedicated group id)
-                        String courseCode = newSelection.codAsignatura;
-                        Integer groupNumber = newSelection.numeroGrupo;
-                        loadGradesForGroup(courseCode, groupNumber);
+                        // Sync combo selection
+                        groupCombo.getSelectionModel().select(newSelection);
+                        // loadGradesForGroup handled by combo listener
                     } else {
                         gradesTable.getItems().clear();
                     }
@@ -117,6 +116,8 @@ public class TeacherDashboardController {
                 // When a group is selected in the combo, load its grades
                 groupCombo.getSelectionModel().selectedItemProperty().addListener((obs, oldG, newG) -> {
                     if (newG != null) {
+                        // Sync table selection
+                        groupsTable.getSelectionModel().select(newG);
                         loadGradesForGroup(newG.codAsignatura, newG.numeroGrupo);
                     }
                 });
@@ -177,7 +178,7 @@ public class TeacherDashboardController {
 
     private void setupGroupCombo() {
         // Use a readable string format for the combo items
-        groupCombo.setConverter(new javafx.util.StringConverter<DocenteGrupoDAO.GroupAssignmentDetails>() {
+        groupCombo.setConverter(new javafx.util.StringConverter<>() {
             @Override
             public String toString(DocenteGrupoDAO.GroupAssignmentDetails object) {
                 if (object == null) return "";
@@ -207,6 +208,9 @@ public class TeacherDashboardController {
 
             // Populate combo as well
             groupCombo.setItems(groupsList);
+            if (!groupsList.isEmpty()) {
+                groupCombo.getSelectionModel().selectFirst();
+            }
 
             logger.info("Loaded {} groups for teacher ID {}", groups.size(), currentTeacherId);
         } catch (SQLException e) {
@@ -263,5 +267,60 @@ public class TeacherDashboardController {
         alert.setHeaderText(null);
         alert.setContentText(message);
         alert.showAndWait();
+    }
+
+    @FXML
+    private void handleRegisterGrade() {
+        GradeDisplay selected = gradesTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showAlert("Atención", "Seleccione un estudiante en la tabla antes de registrar la nota.");
+            return;
+        }
+
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.setTitle("Registrar nota");
+        dialog.setHeaderText("Registrar nota para: " + selected.getStudentName());
+        dialog.setContentText("Ingrese la nota (0.0 - 5.0):");
+
+        dialog.showAndWait().ifPresent(input -> {
+            try {
+                double value = Double.parseDouble(input.replace(',', '.'));
+                if (value < 0.0 || value > 5.0) {
+                    showAlert("Error", "La nota debe estar entre 0.0 y 5.0");
+                    return;
+                }
+
+                // Ensure enrollmentId is present
+                if (selected.getEnrollmentId() == null) {
+                    showAlert("Error", "No se pudo identificar la inscripción del estudiante (id_detalle). No se puede registrar la nota.");
+                    return;
+                }
+
+                // Create domain Grade and persist
+                com.academictracker.model.Grade grade = new com.academictracker.model.Grade();
+                grade.setEnrollmentId(selected.getEnrollmentId());
+                grade.setGradeValue(value);
+                grade.setGradedBy(currentTeacherId);
+
+                com.academictracker.model.Grade created = gradeDAO.create(grade);
+
+                showAlert("Éxito", "Nota registrada correctamente (ID: " + created.getGradeId() + ")");
+
+                // Reload current group grades
+                DocenteGrupoDAO.GroupAssignmentDetails currentGroup = groupCombo.getSelectionModel().getSelectedItem();
+                if (currentGroup != null) {
+                    loadGradesForGroup(currentGroup.codAsignatura, currentGroup.numeroGrupo);
+                } else {
+                    // fallback: clear selection
+                    gradesTable.getItems().clear();
+                }
+
+            } catch (NumberFormatException e) {
+                showAlert("Error", "Formato de nota inválido.");
+            } catch (Exception e) {
+                logger.error("Error registering grade", e);
+                showAlert("Error", "No se pudo registrar la nota: " + e.getMessage());
+            }
+        });
     }
 }
