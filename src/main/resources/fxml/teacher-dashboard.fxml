@@ -100,6 +100,7 @@
                     <HBox spacing="10">
                         <ComboBox fx:id="groupCombo" promptText="Select group" prefWidth="520"/>
                         <Button fx:id="registerGradeButton" text="Registrar nota" onAction="#handleRegisterGrade" />
+                        <Button fx:id="closeCourseButton" text="Cerrar curso" onAction="#handleCloseCourse" />
                     </HBox>
 
                     <!-- Grades table added -->

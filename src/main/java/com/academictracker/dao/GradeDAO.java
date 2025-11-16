@@ -437,5 +437,52 @@ public class GradeDAO {
         return g;
     }
 
-    // ...existing code...
+    /**
+     * Close final grade for an enrollment: compute final value (AVG of Calificacion) and set cerrada = 1
+     */
+    public void closeFinalGradeForEnrollment(Long enrollmentId) throws SQLException {
+        if (enrollmentId == null) throw new SQLException("enrollmentId required");
+
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            // compute average
+            Double avg = null;
+            String avgSql = "SELECT NVL(AVG(nota), 0) AS avg_nota FROM Calificacion WHERE id_detalle = ?";
+            try (PreparedStatement ps = conn.prepareStatement(avgSql)) {
+                ps.setLong(1, enrollmentId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        avg = rs.getDouble("avg_nota");
+                        if (rs.wasNull()) avg = null;
+                    }
+                }
+            }
+
+            if (avg == null) avg = 0.0;
+
+            // try update
+            String updSql = "UPDATE NotaDefinitiva SET nota_definitiva = ?, fecha_calculo = CURRENT_TIMESTAMP, cerrada = 1 WHERE id_detalle = ?";
+            try (PreparedStatement ps = conn.prepareStatement(updSql)) {
+                ps.setDouble(1, avg);
+                ps.setLong(2, enrollmentId);
+                int updated = ps.executeUpdate();
+                if (updated > 0) return;
+            }
+
+            // insert
+            long nextId = 1;
+            String maxSql = "SELECT NVL(MAX(id_nota_definitiva), 0) + 1 AS next_id FROM NotaDefinitiva";
+            try (PreparedStatement ps = conn.prepareStatement(maxSql);
+                 ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) nextId = rs.getLong("next_id");
+            }
+
+            String insSql = "INSERT INTO NotaDefinitiva (id_nota_definitiva, id_detalle, nota_definitiva, fecha_calculo, cerrada) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 1)";
+            try (PreparedStatement ps = conn.prepareStatement(insSql)) {
+                ps.setLong(1, nextId);
+                ps.setLong(2, enrollmentId);
+                ps.setDouble(3, avg);
+                ps.executeUpdate();
+            }
+        }
+    }
 }

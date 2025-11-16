@@ -255,7 +255,36 @@ BEGIN
 END trg_actualizar_nota_detalle_stmt;
 /
 
-commit;
+-- Prevent modifications to Calificacion if NotaDefinitiva is closed (cerrada = 1)
+CREATE OR REPLACE TRIGGER trg_prevent_modify_when_closed
+    BEFORE INSERT OR UPDATE OR DELETE ON Calificacion
+    FOR EACH ROW
+DECLARE
+    v_id_detalle PLS_INTEGER;
+    v_cerrada NUMBER;
+BEGIN
+    IF INSERTING OR UPDATING THEN
+        v_id_detalle := :NEW.id_detalle;
+    ELSIF DELETING THEN
+        v_id_detalle := :OLD.id_detalle;
+    END IF;
+
+    IF v_id_detalle IS NOT NULL THEN
+        SELECT cerrada INTO v_cerrada FROM NotaDefinitiva WHERE id_detalle = v_id_detalle AND ROWNUM = 1;
+        IF v_cerrada = 1 THEN
+            RAISE_APPLICATION_ERROR(-20020, 'La nota definitiva está cerrada para esta inscripción; no se permiten modificaciones.');
+        END IF;
+    END IF;
+
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        NULL; -- no final grade record, allow operation
+END trg_prevent_modify_when_closed;
+
+
+
+
+
 
 
 

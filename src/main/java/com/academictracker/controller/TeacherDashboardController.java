@@ -109,6 +109,9 @@ public class TeacherDashboardController {
     @FXML
     private javafx.scene.control.Button registerGradeButton;
 
+    @FXML
+    private javafx.scene.control.Button closeCourseButton;
+
     private final DocenteGrupoDAO docenteGrupoDAO;
     private final GradeDAO gradeDAO = new GradeDAO();
     private Long currentTeacherId;
@@ -458,5 +461,40 @@ public class TeacherDashboardController {
     public void handleRefreshStudents() {
         DocenteGrupoDAO.GroupAssignmentDetails group = groupCombo.getSelectionModel().getSelectedItem();
         loadStudentsForGroup(group);
+    }
+
+    @FXML
+    public void handleCloseCourse() {
+        DocenteGrupoDAO.GroupAssignmentDetails currentGroup = groupCombo.getSelectionModel().getSelectedItem();
+        if (currentGroup == null) {
+            showAlert("Atención", "Seleccione un grupo antes de cerrar el curso.");
+            return;
+        }
+
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        confirm.setTitle("Confirmar cierre de curso");
+        confirm.setHeaderText("Cerrar curso: " + currentGroup.codAsignatura + " - Grupo " + currentGroup.numeroGrupo);
+        confirm.setContentText("Esta acción marcará las notas definitivas como cerradas y no permitirá agregar más calificaciones. ¿Continuar?");
+
+        confirm.showAndWait().ifPresent(response -> {
+            if (response == ButtonType.OK) {
+                try {
+                    // get all enrollments for the group
+                    List<DocenteGrupoDAO.StudentRow> students = docenteGrupoDAO.getStudentsForGroup(currentGroup.idGrupo);
+                    for (DocenteGrupoDAO.StudentRow s : students) {
+                        gradeDAO.closeFinalGradeForEnrollment(s.getEnrollmentId());
+                    }
+
+                    showAlert("Éxito", "El curso ha sido cerrado correctamente. No se podrán agregar más notas.");
+
+                    // reload UI
+                    loadGradesForGroup(currentGroup.codAsignatura, currentGroup.numeroGrupo);
+                    loadStudentsForGroup(currentGroup);
+                } catch (Exception e) {
+                    logger.error("Error closing course", e);
+                    showAlert("Error", "No se pudo cerrar el curso: " + e.getMessage());
+                }
+            }
+        });
     }
 }
