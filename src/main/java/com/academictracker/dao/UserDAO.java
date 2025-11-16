@@ -29,7 +29,6 @@ public class UserDAO {
 
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
-
             stmt.setLong(1, user.getIdUsuario());
             stmt.setString(2, user.getUsername());
             stmt.setString(3, user.getPasswordHash());

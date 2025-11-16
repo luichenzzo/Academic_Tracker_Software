@@ -170,7 +170,7 @@ BEGIN
             activo = 1
         WHERE username = v_username;
 
-        DBMS_OUTPUT.PUT_LINE('✓ Usuario actualizado exitosamente');
+        DBMS_OUTPUT.PUT_LINE(' Usuario actualizado exitosamente');
         DBMS_OUTPUT.PUT_LINE('  Cédula: ' || p_numero_cedula);
         DBMS_OUTPUT.PUT_LINE('  Estudiante: ' || v_nombres || ' ' || v_apellidos);
         DBMS_OUTPUT.PUT_LINE('  Username: ' || v_username);
@@ -197,7 +197,7 @@ BEGIN
                          1
                      );
 
-            DBMS_OUTPUT.PUT_LINE('✓ Nuevo usuario creado exitosamente');
+            DBMS_OUTPUT.PUT_LINE(' Nuevo usuario creado exitosamente');
             DBMS_OUTPUT.PUT_LINE('  Cédula: ' || p_numero_cedula);
             DBMS_OUTPUT.PUT_LINE('  Estudiante: ' || v_nombres || ' ' || v_apellidos);
             DBMS_OUTPUT.PUT_LINE('  Username: ' || v_username);
@@ -210,7 +210,7 @@ BEGIN
 EXCEPTION
     WHEN OTHERS THEN
         ROLLBACK;
-        DBMS_OUTPUT.PUT_LINE('✗ Error: ' || SQLERRM);
+        DBMS_OUTPUT.PUT_LINE(' Error: ' || SQLERRM);
         RAISE;
 END;
 
