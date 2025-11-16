@@ -1,7 +1,8 @@
 package com.academictracker.controller;
 
 import com.academictracker.dao.DocenteGrupoDAO;
-import com.academictracker.dao.TeacherDAO;
+import com.academictracker.model.GradeDisplay;
+import com.academictracker.dao.GradeDAO;
 import com.academictracker.model.User;
 import com.academictracker.util.SessionManager;
 import javafx.beans.property.SimpleStringProperty;
@@ -15,6 +16,7 @@ import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.URL;
 import java.sql.SQLException;
 import java.util.List;
 
@@ -57,13 +59,32 @@ public class TeacherDashboardController {
     @FXML
     private TableColumn<DocenteGrupoDAO.GroupAssignmentDetails, String> isPrincipalColumn;
 
+    // New: grades table and columns
+    @FXML
+    private TableView<GradeDisplay> gradesTable;
+
+    @FXML
+    private TableColumn<GradeDisplay, String> studentIdColumn;
+
+    @FXML
+    private TableColumn<GradeDisplay, String> studentNameColumn;
+
+    @FXML
+    private TableColumn<GradeDisplay, String> gradeColumn;
+
+    @FXML
+    private TableColumn<GradeDisplay, String> statusColumn;
+
+    // New: combo to select group for grades
+    @FXML
+    private javafx.scene.control.ComboBox<DocenteGrupoDAO.GroupAssignmentDetails> groupCombo;
+
     private final DocenteGrupoDAO docenteGrupoDAO;
-    private final TeacherDAO teacherDAO;
+    private final GradeDAO gradeDAO = new GradeDAO();
     private Long currentTeacherId;
 
     public TeacherDashboardController() {
         this.docenteGrupoDAO = new DocenteGrupoDAO();
-        this.teacherDAO = new TeacherDAO();
     }
 
     @FXML
@@ -77,7 +98,28 @@ public class TeacherDashboardController {
             if (idReferencia != null && !idReferencia.isEmpty()) {
                 currentTeacherId = Long.parseLong(idReferencia);
                 setupTable();
+                setupGradeTable();
+                setupGroupCombo();
                 loadTeacherGroups();
+
+                // When a group is selected in the table, load its grades
+                groupsTable.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, newSelection) -> {
+                    if (newSelection != null) {
+                        // Use course code and group number to identify group (adjust if you have a dedicated group id)
+                        String courseCode = newSelection.codAsignatura;
+                        Integer groupNumber = newSelection.numeroGrupo;
+                        loadGradesForGroup(courseCode, groupNumber);
+                    } else {
+                        gradesTable.getItems().clear();
+                    }
+                });
+
+                // When a group is selected in the combo, load its grades
+                groupCombo.getSelectionModel().selectedItemProperty().addListener((obs, oldG, newG) -> {
+                    if (newG != null) {
+                        loadGradesForGroup(newG.codAsignatura, newG.numeroGrupo);
+                    }
+                });
             } else {
                 logger.error("Teacher ID reference not found in user session");
                 showAlert("Error", "Could not identify teacher profile. Please contact administrator.");
@@ -118,6 +160,37 @@ public class TeacherDashboardController {
             new SimpleStringProperty(cellData.getValue().esPrincipal ? "Yes" : "No"));
     }
 
+    // New: configure grade table columns
+    private void setupGradeTable() {
+        studentIdColumn.setCellValueFactory(cellData ->
+            new SimpleStringProperty(cellData.getValue().getStudentId()));
+
+        studentNameColumn.setCellValueFactory(cellData ->
+            new SimpleStringProperty(cellData.getValue().getStudentName()));
+
+        gradeColumn.setCellValueFactory(cellData ->
+            new SimpleStringProperty(cellData.getValue().getGrade()));
+
+        statusColumn.setCellValueFactory(cellData ->
+            new SimpleStringProperty(cellData.getValue().getStatus()));
+    }
+
+    private void setupGroupCombo() {
+        // Use a readable string format for the combo items
+        groupCombo.setConverter(new javafx.util.StringConverter<DocenteGrupoDAO.GroupAssignmentDetails>() {
+            @Override
+            public String toString(DocenteGrupoDAO.GroupAssignmentDetails object) {
+                if (object == null) return "";
+                return String.format("%s - Grupo %d - %s", object.codAsignatura, object.numeroGrupo, object.periodoNombre);
+            }
+
+            @Override
+            public DocenteGrupoDAO.GroupAssignmentDetails fromString(String string) {
+                return null; // Not needed
+            }
+        });
+    }
+
     private void loadTeacherGroups() {
         if (currentTeacherId == null) {
             return;
@@ -132,10 +205,26 @@ public class TeacherDashboardController {
 
             groupsTable.setItems(groupsList);
 
+            // Populate combo as well
+            groupCombo.setItems(groupsList);
+
             logger.info("Loaded {} groups for teacher ID {}", groups.size(), currentTeacherId);
         } catch (SQLException e) {
             logger.error("Error loading teacher groups", e);
             showAlert("Error", "Failed to load your assigned groups: " + e.getMessage());
+        }
+    }
+
+    // New: load grades for a selected group (courseCode + groupNumber)
+    private void loadGradesForGroup(String courseCode, Integer groupNumber) {
+        try {
+            List<GradeDisplay> grades = gradeDAO.getGradesForGroup(courseCode, groupNumber);
+            ObservableList<GradeDisplay> gradesList = FXCollections.observableArrayList(grades);
+            gradesTable.setItems(gradesList);
+            logger.info("Loaded {} grades for group {} - {}", grades.size(), courseCode, groupNumber);
+        } catch (Exception e) {
+            logger.error("Error loading grades for group", e);
+            showAlert("Error", "Failed to load grades: " + e.getMessage());
         }
     }
 
@@ -152,7 +241,12 @@ public class TeacherDashboardController {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/login.fxml"));
             Scene scene = new Scene(loader.load(), 400, 300);
-            scene.getStylesheets().add(getClass().getResource("/css/style.css").toExternalForm());
+            URL cssUrl = getClass().getResource("/css/style.css");
+            if (cssUrl != null) {
+                scene.getStylesheets().add(cssUrl.toExternalForm());
+            } else {
+                logger.warn("CSS resource /css/style.css not found; skipping stylesheet load");
+            }
 
             Stage stage = (Stage) welcomeLabel.getScene().getWindow();
             stage.setTitle("Academic Tracker - Login");

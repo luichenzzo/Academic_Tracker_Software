@@ -63,7 +63,22 @@
             <Tab text="Grades">
                 <VBox spacing="10" style="-fx-padding: 15;">
                     <Label text="Manage student grades" style="-fx-font-size: 16px;"/>
-                    <Label text="(Coming soon)" style="-fx-text-fill: gray;"/>
+
+                    <!-- Group selector combo added -->
+                    <ComboBox fx:id="groupCombo" promptText="Select group" prefWidth="600"/>
+
+                    <!-- Grades table added -->
+                    <TableView fx:id="gradesTable" VBox.vgrow="ALWAYS">
+                        <columns>
+                            <TableColumn fx:id="studentIdColumn" text="Student ID" prefWidth="120"/>
+                            <TableColumn fx:id="studentNameColumn" text="Student Name" prefWidth="250"/>
+                            <TableColumn fx:id="gradeColumn" text="Grade" prefWidth="100"/>
+                            <TableColumn fx:id="statusColumn" text="Status" prefWidth="120"/>
+                        </columns>
+                        <placeholder>
+                            <Label text="Select a group to view grades" style="-fx-text-fill: gray;"/>
+                        </placeholder>
+                    </TableView>
                 </VBox>
             </Tab>
         </TabPane>
