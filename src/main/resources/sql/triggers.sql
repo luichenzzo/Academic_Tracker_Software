@@ -153,6 +153,110 @@ END;
 -- =============================================
 -- TRIGGER 3: Actualizar nota definitiva automáticamente
 -- =============================================
+-- Package to hold collection of id_detalle affected by DML on Calificacion
+CREATE OR REPLACE PACKAGE pkg_trg_nota AS
+    TYPE t_id_set IS TABLE OF PLS_INTEGER INDEX BY PLS_INTEGER;
+    g_id_set t_id_set;
+
+    PROCEDURE add_det(p_det IN PLS_INTEGER);
+    PROCEDURE process_and_clear;
+END pkg_trg_nota;
+/
+
+CREATE OR REPLACE PACKAGE BODY pkg_trg_nota AS
+    PROCEDURE add_det(p_det IN PLS_INTEGER) IS
+    BEGIN
+        IF p_det IS NOT NULL THEN
+            g_id_set(p_det) := 1; -- mark presence
+        END IF;
+    EXCEPTION WHEN OTHERS THEN
+        NULL; -- safe guard, do not raise from row trigger
+    END add_det;
+
+    PROCEDURE process_and_clear IS
+        key PLS_INTEGER;
+        v_id_detalle PLS_INTEGER;
+        v_nota_definitiva NUMBER(7,4);
+        v_id_nota_def NUMBER;
+    BEGIN
+        key := g_id_set.FIRST;
+        WHILE key IS NOT NULL LOOP
+                v_id_detalle := key;
+
+                BEGIN
+                    -- Calculate definitive grade for this enrollment as the average of Calificacion.nota
+                    SELECT NVL(AVG(c.nota), 0)
+                    INTO v_nota_definitiva
+                    FROM Calificacion c
+                    WHERE c.id_detalle = v_id_detalle;
+
+                    v_nota_definitiva := GREATEST(0, LEAST(5, v_nota_definitiva));
+
+                    -- Try to update existing NotaDefinitiva
+                    UPDATE NotaDefinitiva
+                    SET nota_definitiva = v_nota_definitiva,
+                        fecha_calculo = CURRENT_TIMESTAMP
+                    WHERE id_detalle = v_id_detalle;
+
+                    IF SQL%ROWCOUNT = 0 THEN
+                        SELECT NVL(MAX(id_nota_definitiva), 0) + 1 INTO v_id_nota_def FROM NotaDefinitiva;
+                        BEGIN
+                            INSERT INTO NotaDefinitiva (id_nota_definitiva, id_detalle, nota_definitiva, fecha_calculo, cerrada)
+                            VALUES (v_id_nota_def, v_id_detalle, v_nota_definitiva, CURRENT_TIMESTAMP, 0);
+                        EXCEPTION
+                            WHEN DUP_VAL_ON_INDEX THEN
+                                UPDATE NotaDefinitiva
+                                SET nota_definitiva = v_nota_definitiva,
+                                    fecha_calculo = CURRENT_TIMESTAMP
+                                WHERE id_detalle = v_id_detalle;
+                        END;
+                    END IF;
+
+                EXCEPTION
+                    WHEN NO_DATA_FOUND THEN
+                        BEGIN
+                            DELETE FROM NotaDefinitiva WHERE id_detalle = v_id_detalle;
+                        EXCEPTION WHEN OTHERS THEN NULL;
+                        END;
+                    WHEN OTHERS THEN
+                        -- In statement-level processing we rethrow so the caller sees the error
+                        RAISE;
+                END;
+
+                -- move to next key
+                key := g_id_set.NEXT(key);
+            END LOOP;
+
+        -- clear the collection for next execution
+        -- reinitialize the associative array to empty
+        g_id_set := t_id_set();
+    END process_and_clear;
+END pkg_trg_nota;
+/
+
+-- Row-level trigger: collect affected id_detalle values into package collection
+CREATE OR REPLACE TRIGGER trg_actualizar_nota_detalle_row
+    AFTER INSERT OR UPDATE OR DELETE ON Calificacion
+    FOR EACH ROW
+BEGIN
+    IF INSERTING OR UPDATING THEN
+        pkg_trg_nota.add_det(:NEW.id_detalle);
+    ELSIF DELETING THEN
+        pkg_trg_nota.add_det(:OLD.id_detalle);
+    END IF;
+END trg_actualizar_nota_detalle_row;
+/
+
+-- Statement-level trigger: process collected ids and update NotaDefinitiva
+CREATE OR REPLACE TRIGGER trg_actualizar_nota_detalle_stmt
+    AFTER INSERT OR UPDATE OR DELETE ON Calificacion
+BEGIN
+    pkg_trg_nota.process_and_clear;
+END trg_actualizar_nota_detalle_stmt;
+/
+
+commit;
+
 
 
 
