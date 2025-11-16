@@ -230,6 +230,65 @@ public class GradeDAO {
         return list;
     }
 
+    /**
+     * Returns final calculated grades stored in NotaDefinitiva for a specific student.
+     * This is used when final grades are stored in the NotaDefinitiva table instead of Calificacion.
+     */
+    public List<Grade> findFinalGradesByStudent(String studentId) throws SQLException {
+        String sql = "SELECT nd.id_nota_definitiva AS id_nota_definitiva, nd.id_detalle AS id_detalle, nd.nota_definitiva AS nota_definitiva " +
+                     "FROM NotaDefinitiva nd " +
+                     "JOIN DetalleMatricula dm ON nd.id_detalle = dm.id_detalle " +
+                     "JOIN Matricula m ON dm.id_matricula = m.id_matricula " +
+                     "WHERE m.cod_estudiante = ? ORDER BY nd.fecha_calculo DESC";
+
+        List<Grade> list = new ArrayList<>();
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setString(1, studentId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Grade g = new Grade();
+                    g.setGradeId(rs.getLong("id_nota_definitiva"));
+                    long enrollmentId = rs.getLong("id_detalle");
+                    if (!rs.wasNull()) g.setEnrollmentId(enrollmentId);
+                    double nota = rs.getDouble("nota_definitiva");
+                    if (!rs.wasNull()) g.setGradeValue(nota);
+                    list.add(g);
+                }
+            }
+        }
+
+        return list;
+    }
+
+    /**
+     * Find a final grade (NotaDefinitiva) for a specific enrollment (id_detalle).
+     */
+    public Optional<Grade> findFinalGradeByEnrollment(Long enrollmentId) throws SQLException {
+        String sql = "SELECT id_nota_definitiva, id_detalle, nota_definitiva FROM NotaDefinitiva WHERE id_detalle = ? ORDER BY fecha_calculo DESC";
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setLong(1, enrollmentId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    Grade g = new Grade();
+                    g.setGradeId(rs.getLong("id_nota_definitiva"));
+                    long det = rs.getLong("id_detalle");
+                    if (!rs.wasNull()) g.setEnrollmentId(det);
+                    double nota = rs.getDouble("nota_definitiva");
+                    if (!rs.wasNull()) g.setGradeValue(nota);
+                    return Optional.of(g);
+                }
+            }
+        }
+
+        return Optional.empty();
+    }
+
     private Grade mapResultSetToGrade(ResultSet rs) throws SQLException {
         Grade g = new Grade();
         g.setGradeId(rs.getLong("id_calificacion"));

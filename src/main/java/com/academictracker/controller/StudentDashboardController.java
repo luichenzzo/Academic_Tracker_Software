@@ -68,6 +68,7 @@ public class StudentDashboardController {
     @FXML private TableColumn<GradeDTO, String> colGradeCreditos;
     @FXML private TableColumn<GradeDTO, String> colNotaDefinitiva;
     @FXML private TableColumn<GradeDTO, String> colGradeEstado;
+    @FXML private Label gradesStatusLabel;
 
     // DAOs
     private final StudentDAO studentDAO = new StudentDAO();
@@ -75,6 +76,7 @@ public class StudentDashboardController {
     private final DetalleMatriculaDAO detalleMatriculaDAO = new DetalleMatriculaDAO();
     private final GrupoDAO grupoDAO = new GrupoDAO();
     private final PeriodoAcademicoDAO periodoAcademicoDAO = new PeriodoAcademicoDAO();
+    private final GradeDAO gradeDAO = new GradeDAO();
 
     // Current student and enrollment data
     private Student currentStudent;
@@ -87,8 +89,132 @@ public class StudentDashboardController {
         loadStudentData();
         loadCurrentPeriod();
         loadEnrolledCourses();
+        loadGrades();
         loadAvailableGroups();
         setupTableSelectionListeners();
+    }
+
+    /**
+     * Load all grades associated with the current student and populate the gradesTable.
+     */
+    @FXML
+    private void loadGrades() {
+        try {
+            logger.debug("loadGrades(): invoked. gradesTable=null? {}", gradesTable == null);
+            logger.debug("loadGrades(): columns null? cod={}, nombre={}, grupo={}, creditos={}, nota={}, estado={}",
+                colGradeCodAsignatura == null, colGradeNombreAsignatura == null,
+                colGradeGrupo == null, colGradeCreditos == null, colNotaDefinitiva == null, colGradeEstado == null);
+
+            if (currentStudent == null) {
+                // Attempt to recover currentStudent from SessionManager as a fallback
+                try {
+                    User cu = SessionManager.getInstance().getCurrentUser();
+                    if (cu != null) {
+                        logger.info("loadGrades(): attempting fallback loadStudentData from SessionManager: {} / {}", cu.getUsername(), cu.getIdReferencia());
+                        Optional<Student> sOpt = Optional.empty();
+                        if (cu.getIdReferencia() != null && !cu.getIdReferencia().isEmpty()) {
+                            sOpt = studentDAO.findById(cu.getIdReferencia());
+                        }
+                        if (!sOpt.isPresent()) {
+                            sOpt = studentDAO.findByCorreoInstitucional(cu.getUsername());
+                        }
+                        if (sOpt.isPresent()) {
+                            currentStudent = sOpt.get();
+                            logger.info("loadGrades(): fallback loaded student {}", currentStudent.getCodEstudiante());
+                        }
+                    }
+                } catch (SQLException sqe) {
+                    logger.warn("loadGrades(): fallback student lookup failed", sqe);
+                }
+                gradesTable.setItems(FXCollections.observableArrayList());
+                gradesTable.setPlaceholder(new Label("No hay calificaciones (estudiante no encontrado)"));
+                promedioLabel.setText("Promedio: -");
+                logger.info("loadGrades(): currentStudent is null, aborting");
+                return;
+            }
+
+            logger.info("loadGrades(): currentStudent={}, currentMatricula={}", currentStudent.getCodEstudiante(), currentMatricula != null ? currentMatricula.getIdMatricula() : null);
+
+            ObservableList<GradeDTO> gradeList = FXCollections.observableArrayList();
+            double sum = 0.0;
+            int count = 0;
+
+            List<Matricula> matriculas = matriculaDAO.findByStudent(currentStudent.getCodEstudiante());
+            logger.info("loadGrades(): found {} matriculas for student {}", matriculas.size(), currentStudent.getCodEstudiante());
+
+            for (Matricula m : matriculas) {
+                List<DetalleMatricula> detalles = detalleMatriculaDAO.findByMatricula(m.getIdMatricula());
+                logger.info("loadGrades(): matricula {} has {} detalles", m.getIdMatricula(), detalles.size());
+                for (DetalleMatricula detalle : detalles) {
+                    GradeDTO dto = new GradeDTO();
+
+                    if (detalle.getGrupo() != null && detalle.getGrupo().getAsignatura() != null) {
+                        dto.setCodAsignatura(detalle.getGrupo().getCodAsignatura());
+                        dto.setNombreAsignatura(detalle.getGrupo().getAsignatura().getNombre());
+                        dto.setGrupo(String.valueOf(detalle.getGrupo().getNumeroGrupo()));
+                        dto.setCreditos(String.valueOf(detalle.getGrupo().getAsignatura().getCreditos()));
+                    } else {
+                        dto.setCodAsignatura("-");
+                        dto.setNombreAsignatura("-");
+                        dto.setGrupo("-");
+                        dto.setCreditos("-");
+                    }
+
+                    // Try find final grade in NotaDefinitiva
+                    Optional<com.academictracker.model.Grade> finalGradeOpt = gradeDAO.findFinalGradeByEnrollment(detalle.getIdDetalle());
+                    Double gradeVal = null;
+
+                    if (finalGradeOpt.isPresent()) {
+                        gradeVal = finalGradeOpt.get().getGradeValue();
+                        logger.info("loadGrades(): detalle {} -> found NotaDefinitiva = {}", detalle.getIdDetalle(), gradeVal);
+                    } else {
+                        // Fallback to Calificacion entries for this enrollment
+                        List<com.academictracker.model.Grade> califs = gradeDAO.findByEnrollment(detalle.getIdDetalle());
+                        if (califs != null && !califs.isEmpty()) {
+                            gradeVal = califs.get(0).getGradeValue(); // findByEnrollment returns ordered desc
+                            logger.info("loadGrades(): detalle {} -> found Calificacion = {} (count={})", detalle.getIdDetalle(), gradeVal, califs.size());
+                        } else {
+                            logger.info("loadGrades(): detalle {} -> no grade found", detalle.getIdDetalle());
+                        }
+                    }
+
+                    if (gradeVal != null) {
+                        dto.setNotaDefinitiva(String.format("%.2f", gradeVal));
+                        dto.setEstado(gradeVal >= 3.0 ? "Aprobado" : "Reprobado");
+                        sum += gradeVal;
+                        count++;
+                    } else {
+                        dto.setNotaDefinitiva("N/A");
+                        dto.setEstado(detalle.getEstado() != null ? detalle.getEstado() : "Sin nota");
+                    }
+
+                    gradeList.add(dto);
+                }
+            }
+
+            gradesTable.setItems(gradeList);
+            // Force refresh to ensure rows are displayed
+            gradesTable.refresh();
+
+            gradesTable.setPlaceholder(new Label("No hay calificaciones registradas"));
+
+            logger.info("loadGrades(): gradeList size = {} (count numeric={})", gradeList.size(), count);
+
+            if (gradesStatusLabel != null) {
+                gradesStatusLabel.setText(String.format("Asignaturas: %d — Notas numéricas: %d", gradeList.size(), count));
+            }
+
+            if (count > 0) {
+                double avg = sum / count;
+                promedioLabel.setText(String.format("Promedio: %.2f", avg));
+            } else {
+                promedioLabel.setText("Promedio: -");
+            }
+
+        } catch (SQLException e) {
+            logger.error("Error loading grades", e);
+            showError("Error", "No se pudieron cargar las calificaciones: " + e.getMessage());
+        }
     }
 
     private void setupTables() {
@@ -525,6 +651,7 @@ public class StudentDashboardController {
         loadEnrolledCourses();
         loadAvailableGroups();
         enrollmentMessageLabel.setText("");
+        loadGrades();
     }
 
     @FXML

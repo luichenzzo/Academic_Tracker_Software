@@ -113,7 +113,13 @@
                         <Label fx:id="promedioLabel" text="Promedio: -" style="-fx-font-size: 14px; -fx-font-weight: bold;"/>
                     </HBox>
 
+                    <!-- Status label for grades (shows count/messages) -->
+                    <Label fx:id="gradesStatusLabel" text="" />
+
                     <TableView fx:id="gradesTable" VBox.vgrow="ALWAYS">
+                        <placeholder>
+                            <Label text="No hay calificaciones registradas" />
+                        </placeholder>
                         <columns>
                             <TableColumn fx:id="colGradeCodAsignatura" text="Código" prefWidth="100"/>
                             <TableColumn fx:id="colGradeNombreAsignatura" text="Asignatura" prefWidth="250"/>
