@@ -296,24 +296,64 @@ public class TeacherDashboardController {
                     return;
                 }
 
-                // Create domain Grade and persist
-                com.academictracker.model.Grade grade = new com.academictracker.model.Grade();
-                grade.setEnrollmentId(selected.getEnrollmentId());
-                grade.setGradeValue(value);
-                grade.setGradedBy(currentTeacherId);
+                // Ask for optional comment/label for this evaluation
+                TextInputDialog commentDialog = new TextInputDialog();
+                commentDialog.setTitle("Etiqueta de evaluación (opcional)");
+                commentDialog.setHeaderText("Registrar nota para: " + selected.getStudentName());
+                commentDialog.setContentText("Ingrese una etiqueta o descripción para esta evaluación (opcional):");
 
-                com.academictracker.model.Grade created = gradeDAO.create(grade);
+                commentDialog.showAndWait().ifPresentOrElse(comment -> {
+                    try {
+                        // Create domain Grade and persist as Calificacion (allow multiple per student)
+                        com.academictracker.model.Grade grade = new com.academictracker.model.Grade();
+                        grade.setEnrollmentId(selected.getEnrollmentId());
+                        grade.setGradeValue(value);
+                        grade.setGradedBy(currentTeacherId);
+                        if (!comment.isBlank()) {
+                            grade.setComments(comment);
+                        }
 
-                showAlert("Éxito", "Nota registrada correctamente (ID: " + created.getGradeId() + ")");
+                        com.academictracker.model.Grade created = gradeDAO.createCalificacion(grade);
 
-                // Reload current group grades
-                DocenteGrupoDAO.GroupAssignmentDetails currentGroup = groupCombo.getSelectionModel().getSelectedItem();
-                if (currentGroup != null) {
-                    loadGradesForGroup(currentGroup.codAsignatura, currentGroup.numeroGrupo);
-                } else {
-                    // fallback: clear selection
-                    gradesTable.getItems().clear();
-                }
+                        showAlert("Éxito", "Nota registrada correctamente (ID: " + created.getGradeId() + ")");
+
+                        // Reload current group grades
+                        DocenteGrupoDAO.GroupAssignmentDetails currentGroup = groupCombo.getSelectionModel().getSelectedItem();
+                        if (currentGroup != null) {
+                            loadGradesForGroup(currentGroup.codAsignatura, currentGroup.numeroGrupo);
+                        } else {
+                            // fallback: clear selection
+                            gradesTable.getItems().clear();
+                        }
+
+                    } catch (Exception e) {
+                        logger.error("Error registering calificacion", e);
+                        showAlert("Error", "No se pudo registrar la nota: " + e.getMessage());
+                    }
+                }, () -> {
+                    // If user closed the comment dialog without entering text, still create the calificacion
+                    try {
+                        com.academictracker.model.Grade grade = new com.academictracker.model.Grade();
+                        grade.setEnrollmentId(selected.getEnrollmentId());
+                        grade.setGradeValue(value);
+                        grade.setGradedBy(currentTeacherId);
+
+                        com.academictracker.model.Grade created = gradeDAO.createCalificacion(grade);
+
+                        showAlert("Éxito", "Nota registrada correctamente (ID: " + created.getGradeId() + ")");
+
+                        DocenteGrupoDAO.GroupAssignmentDetails currentGroup = groupCombo.getSelectionModel().getSelectedItem();
+                        if (currentGroup != null) {
+                            loadGradesForGroup(currentGroup.codAsignatura, currentGroup.numeroGrupo);
+                        } else {
+                            gradesTable.getItems().clear();
+                        }
+
+                    } catch (Exception e) {
+                        logger.error("Error registering calificacion (no comment)", e);
+                        showAlert("Error", "No se pudo registrar la nota: " + e.getMessage());
+                    }
+                });
 
             } catch (NumberFormatException e) {
                 showAlert("Error", "Formato de nota inválido.");

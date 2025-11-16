@@ -28,11 +28,14 @@ public class GradeDAO {
     public List<GradeDisplay> getGradesForGroup(String courseCode, Integer groupNumber) throws SQLException {
         List<GradeDisplay> result = new ArrayList<>();
 
-        String sql = "SELECT e.cod_estudiante AS student_id, (e.nombres || ' ' || e.apellidos) AS student_name, nd.nota_definitiva AS grade_value, dm.id_detalle AS enrollment_id " +
+        String sql = "SELECT e.cod_estudiante AS student_id, (e.nombres || ' ' || e.apellidos) AS student_name, " +
+                "NVL(nd.nota_definitiva, c.nota) AS grade_value, dm.id_detalle AS enrollment_id " +
                 "FROM Grupo g " +
                 "JOIN DetalleMatricula dm ON dm.id_grupo = g.id_grupo " +
                 "JOIN Matricula m ON m.id_matricula = dm.id_matricula " +
                 "JOIN Estudiante e ON e.cod_estudiante = m.cod_estudiante " +
+                // Subquery c selects the most recent Calificacion per id_detalle
+                "LEFT JOIN (SELECT id_detalle, nota FROM (SELECT id_detalle, nota, ROW_NUMBER() OVER (PARTITION BY id_detalle ORDER BY fecha_registro DESC) rn FROM Calificacion) WHERE rn = 1) c ON c.id_detalle = dm.id_detalle " +
                 "LEFT JOIN NotaDefinitiva nd ON nd.id_detalle = dm.id_detalle " +
                 "WHERE g.cod_asignatura = ? AND g.numero_grupo = ? " +
                 "ORDER BY e.apellidos, e.nombres";
@@ -131,6 +134,125 @@ public class GradeDAO {
                 int rows = psIns.executeUpdate();
                 if (rows == 0) {
                     throw new SQLException("Creating NotaDefinitiva failed, no rows affected.");
+                }
+
+                grade.setGradeId(nextId);
+                return grade;
+            }
+        }
+    }
+
+    /**
+     * Create a new Calificacion (individual grade record) for an enrollment.
+     * If the enrollment's group has no evaluation rule (ReglaEvaluacion), a default rule is created.
+     * This allows teachers to add multiple grade records per student (e.g., project evaluations).
+     */
+    public Grade createCalificacion(Grade grade) throws SQLException {
+        if (grade.getEnrollmentId() == null) {
+            throw new SQLException("Enrollment id (id_detalle) is required to create a Calificacion");
+        }
+
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            // 1) Find the group for the enrollment
+            Long groupId = null;
+            String groupSql = "SELECT id_grupo FROM DetalleMatricula WHERE id_detalle = ?";
+            try (PreparedStatement ps = conn.prepareStatement(groupSql)) {
+                ps.setLong(1, grade.getEnrollmentId());
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        groupId = rs.getLong("id_grupo");
+                    }
+                }
+            }
+
+            if (groupId == null) {
+                throw new SQLException("Could not find group for enrollment id: " + grade.getEnrollmentId());
+            }
+
+            // 2) Find an existing ReglaEvaluacion for the group (prefer an automatic one created previously)
+            Long reglaId = null;
+            String findAutoReglaSql = "SELECT id_regla FROM ReglaEvaluacion WHERE id_grupo = ? AND nombre_item LIKE 'Auto:%' AND ROWNUM = 1";
+            try (PreparedStatement ps = conn.prepareStatement(findAutoReglaSql)) {
+                ps.setLong(1, groupId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        reglaId = rs.getLong("id_regla");
+                    }
+                }
+            }
+
+            // If no auto rule found, try to find any existing rule for the group
+            if (reglaId == null) {
+                String findReglaSql = "SELECT id_regla FROM ReglaEvaluacion WHERE id_grupo = ? AND ROWNUM = 1";
+                try (PreparedStatement ps = conn.prepareStatement(findReglaSql)) {
+                    ps.setLong(1, groupId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) {
+                            reglaId = rs.getLong("id_regla");
+                        }
+                    }
+                }
+            }
+
+            // 3) If no rule exists at all, create a single default auto rule for this group (one per group)
+            if (reglaId == null) {
+                // Prepare name for auto rule
+                String autoName = grade.getComments() != null && !grade.getComments().isBlank() ? "Auto: " + grade.getComments() : "Auto: Evaluación rápida";
+
+                // Use MERGE so concurrent callers won't create duplicates (Oracle MERGE is atomic)
+                String mergeSql = "MERGE INTO ReglaEvaluacion r " +
+                                  "USING (SELECT ? AS id_grupo, ? AS nombre_item FROM dual) src " +
+                                  "ON (r.id_grupo = src.id_grupo AND r.nombre_item = src.nombre_item) " +
+                                  "WHEN NOT MATCHED THEN " +
+                                  "INSERT (id_regla, id_grupo, nombre_item, porcentaje) " +
+                                  "VALUES ((SELECT NVL(MAX(id_regla), 0) + 1 FROM ReglaEvaluacion), src.id_grupo, src.nombre_item, ?)";
+
+                try (PreparedStatement ps = conn.prepareStatement(mergeSql)) {
+                    ps.setLong(1, groupId);
+                    ps.setString(2, autoName);
+                    ps.setDouble(3, 100.0);
+                    ps.executeUpdate();
+                }
+
+                // Retrieve the regla id (either existing or just inserted)
+                String selectReglaSql = "SELECT id_regla FROM ReglaEvaluacion WHERE id_grupo = ? AND nombre_item = ? AND ROWNUM = 1";
+                try (PreparedStatement ps = conn.prepareStatement(selectReglaSql)) {
+                    ps.setLong(1, groupId);
+                    ps.setString(2, autoName);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) {
+                            reglaId = rs.getLong("id_regla");
+                        }
+                    }
+                }
+            }
+
+            // 4) Generate next id for Calificacion
+            long nextId = 1;
+            String maxSql = "SELECT NVL(MAX(id_calificacion), 0) + 1 AS next_id FROM Calificacion";
+            try (PreparedStatement ps = conn.prepareStatement(maxSql);
+                 ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    nextId = rs.getLong("next_id");
+                }
+            }
+
+            // 5) Insert new Calificacion record
+            String insertSql = "INSERT INTO Calificacion (id_calificacion, id_detalle, id_regla, nota, fecha_registro, id_docente_registra) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, ?)";
+            try (PreparedStatement ps = conn.prepareStatement(insertSql)) {
+                ps.setLong(1, nextId);
+                ps.setLong(2, grade.getEnrollmentId());
+                ps.setLong(3, reglaId);
+                ps.setDouble(4, grade.getGradeValue() != null ? grade.getGradeValue() : 0.0);
+                if (grade.getGradedBy() != null) {
+                    ps.setLong(5, grade.getGradedBy());
+                } else {
+                    ps.setNull(5, java.sql.Types.BIGINT);
+                }
+
+                int rows = ps.executeUpdate();
+                if (rows == 0) {
+                    throw new SQLException("Creating Calificacion failed, no rows affected.");
                 }
 
                 grade.setGradeId(nextId);
