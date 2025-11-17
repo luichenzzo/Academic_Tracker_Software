@@ -60,6 +60,7 @@
                     <HBox spacing="10">
                         <Label text="Use group selector in the Grades tab" />
                         <Button text="Refresh Students" onAction="#handleRefreshStudents" />
+                        <Button fx:id="withdrawButton" text="Dar de baja" onAction="#handleWithdrawStudent" />
                     </HBox>
 
                     <SplitPane prefHeight="400">

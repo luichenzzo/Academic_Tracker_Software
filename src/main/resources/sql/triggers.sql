@@ -275,6 +275,75 @@ EXCEPTION
 END trg_prevent_modify_when_closed;
 
 
+-- =============================================
+-- TRIGGER 4: Verificar limite de creditos en base de nivel de riesgo
+-- =============================================
+CREATE OR REPLACE TRIGGER trg_limit_credits_by_risk
+    BEFORE INSERT OR UPDATE ON DetalleMatricula
+    FOR EACH ROW
+DECLARE
+    v_cod_estudiante    Estudiante.cod_estudiante%TYPE;
+    v_nivel             Estudiante.nivel_riesgo%TYPE;
+    v_allowed           NUMBER;
+    v_existing_credits  NUMBER := 0;
+    v_group_credits     NUMBER := 0;
+BEGIN
+    -- Get credits of the group being enrolled
+    SELECT a.creditos
+    INTO v_group_credits
+    FROM Grupo g JOIN Asignatura a ON g.cod_asignatura = a.cod_asignatura
+    WHERE g.id_grupo = :NEW.id_grupo;
+
+    -- Sum existing credits for this matricula, excluding the current detail if updating
+    SELECT NVL(SUM(a.creditos), 0)
+    INTO v_existing_credits
+    FROM DetalleMatricula dm
+             JOIN Grupo g2 ON dm.id_grupo = g2.id_grupo
+             JOIN Asignatura a ON g2.cod_asignatura = a.cod_asignatura
+    WHERE dm.id_matricula = :NEW.id_matricula
+      AND ( :NEW.id_detalle IS NULL OR dm.id_detalle != :NEW.id_detalle );
+
+    -- Determine student's code from Matricula
+    SELECT m.cod_estudiante
+    INTO v_cod_estudiante
+    FROM Matricula m
+    WHERE m.id_matricula = :NEW.id_matricula;
+
+    -- Get student's risk level
+    SELECT e.nivel_riesgo
+    INTO v_nivel
+    FROM Estudiante e
+    WHERE e.cod_estudiante = v_cod_estudiante;
+
+    -- Map allowed credits according to risk level
+    IF v_nivel IS NULL THEN
+        v_allowed := 21; -- default no risk
+    ELSIF v_nivel = 0 THEN
+        v_allowed := 21;
+    ELSIF v_nivel = 1 OR v_nivel = 3 THEN
+        v_allowed := 8;
+    ELSIF v_nivel = 2 THEN
+        v_allowed := 12;
+    ELSIF v_nivel = 4 THEN
+        v_allowed := 16;
+    ELSE
+        v_allowed := 21;
+    END IF;
+
+    -- New total if this enrollment proceeds
+    IF (v_existing_credits + v_group_credits) > v_allowed THEN
+        RAISE_APPLICATION_ERROR(-20032, 'Límite de créditos excedido para nivel de riesgo ' || NVL(TO_CHAR(v_nivel),'0')
+            || '. Permitidos: ' || v_allowed || ', intentados: ' || (v_existing_credits + v_group_credits));
+    END IF;
+
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RAISE_APPLICATION_ERROR(-20031, 'Datos insuficientes para validar límite de créditos.');
+    WHEN OTHERS THEN
+        -- Propagate unexpected errors with context
+        RAISE_APPLICATION_ERROR(-20033, 'Error validando límite de créditos: ' || SQLERRM);
+END trg_limit_credits_by_risk;
+/
 
 
 

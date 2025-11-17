@@ -112,6 +112,9 @@ public class TeacherDashboardController {
     @FXML
     private javafx.scene.control.Button closeCourseButton;
 
+    @FXML
+    private javafx.scene.control.Button withdrawButton;
+
     private final DocenteGrupoDAO docenteGrupoDAO;
     private final GradeDAO gradeDAO = new GradeDAO();
     private Long currentTeacherId;
@@ -493,6 +496,44 @@ public class TeacherDashboardController {
                 } catch (Exception e) {
                     logger.error("Error closing course", e);
                     showAlert("Error", "No se pudo cerrar el curso: " + e.getMessage());
+                }
+            }
+        });
+    }
+
+    @FXML
+    public void handleWithdrawStudent() {
+        DocenteGrupoDAO.StudentRow selected = studentsTable.getSelectionModel().getSelectedItem();
+        DocenteGrupoDAO.GroupAssignmentDetails currentGroup = groupCombo.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showAlert("Atención", "Seleccione un estudiante antes de dar de baja.");
+            return;
+        }
+        if (currentGroup == null) {
+            showAlert("Atención", "Seleccione un grupo primero.");
+            return;
+        }
+
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        confirm.setTitle("Confirmar baja");
+        confirm.setHeaderText("Dar de baja a: " + selected.getFullName());
+        confirm.setContentText("Confirma la baja del estudiante del grupo? Esta acción eliminará la inscripción.");
+
+        confirm.showAndWait().ifPresent(resp -> {
+            if (resp == ButtonType.OK) {
+                try {
+                    com.academictracker.dao.EnrollmentDAO enrollmentDAO = new com.academictracker.dao.EnrollmentDAO();
+                    boolean ok = enrollmentDAO.deleteEnrollment(selected.getEnrollmentId());
+                    if (ok) {
+                        showAlert("Éxito", "La inscripción se ha cancelado correctamente.");
+                        loadStudentsForGroup(currentGroup);
+                        loadGradesForGroup(currentGroup.codAsignatura, currentGroup.numeroGrupo);
+                    } else {
+                        showAlert("Error", "No se pudo cancelar la inscripción. Revise los mensajes o permisos.");
+                    }
+                } catch (Exception e) {
+                    logger.error("Error during withdrawal", e);
+                    showAlert("Error", "No se pudo procesar la baja: " + e.getMessage());
                 }
             }
         });
