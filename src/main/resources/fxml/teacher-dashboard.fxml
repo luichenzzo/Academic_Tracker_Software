@@ -24,6 +24,8 @@
                         <Font name="System Bold" size="18"/>
                     </font>
                 </Label>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Button text="Logout" onAction="#handleLogout" style="-fx-background-color: transparent; -fx-text-fill: white; -fx-font-weight: bold;" />
             </HBox>
         </VBox>
     </top>
