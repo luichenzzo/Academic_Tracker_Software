@@ -150,11 +150,7 @@ VALUES (3, '80456789', 'CC', 'Pedro Antonio', 'Martínez Silva', 'pmartinez@uniq
 INSERT INTO UsuarioSistema (id_usuario, username, password_hash, rol, id_referencia, tipo_referencia, activo)
 VALUES (1, 'admin', '$2a$10$PbpLJh9Uzk1W0HE0/HfuteX7LkGrXVDTLuOROTzVi9FpdeQVakube', 'ADMIN', NULL, NULL, 1);
 
-INSERT INTO UsuarioSistema (id_usuario, username, password_hash, rol, id_referencia, tipo_referencia, activo)
-VALUES (2, 'jramirez', '$2a$10$PbpLJh9Uzk1W0HE0/HfuteX7LkGrXVDTLuOROTzVi9FpdeQVakube', 'DOCENTE', '1', 'Docente', 1);
 
-INSERT INTO UsuarioSistema (id_usuario, username, password_hash, rol, id_referencia, tipo_referencia, activo)
-VALUES (3, 'mgonzalez', '$2a$10$PbpLJh9Uzk1W0HE0/HfuteX7LkGrXVDTLuOROTzVi9FpdeQVakube', 'DOCENTE', '2', 'Docente', 1);
 
 COMMIT;
 
