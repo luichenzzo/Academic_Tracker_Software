@@ -44,6 +44,7 @@
                         <Button text="Edit Student" styleClass="secondary-button" onAction="#handleEditStudent"/>
                         <Button text="Delete Student" styleClass="danger-button" onAction="#handleDeleteStudent"/>
                         <Button text="View Details" onAction="#handleViewStudentDetails"/>
+                        <Button fx:id="evaluateRisksButton" text="Evaluar riesgos" onAction="#handleEvaluateRisks" />
                     </HBox>
                     
                     <TableView fx:id="studentTable" VBox.vgrow="ALWAYS">

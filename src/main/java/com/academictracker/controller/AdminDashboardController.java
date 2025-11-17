@@ -91,6 +91,8 @@ public class AdminDashboardController {
     @FXML private TableColumn<AccountCandidate, String> userEmailColumn;
     @FXML private TableColumn<AccountCandidate, String> userStatusColumn;
 
+    @FXML private javafx.scene.control.Button evaluateRisksButton;
+
     private final UserService userService;
     private final AcademicService academicService;
     
@@ -2134,5 +2136,29 @@ public class AdminDashboardController {
         alert.setHeaderText(null);
         alert.setContentText(message);
         alert.showAndWait();
+    }
+
+    @FXML
+    private void handleEvaluateRisks() {
+        try {
+            AcademicService.RiskRunInfo info = academicService.evaluateRisks();
+            String message = String.format("Evaluación de riesgos ejecutada en %s. Estudiantes actualizados: %d. Posibles expulsiones: %d.",
+                    info.runTimestamp != null ? info.runTimestamp.toString() : "(sin timestamp)", info.updatedCount, info.expelledCount);
+
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle("Resultado evaluación de riesgos");
+            alert.setHeaderText("Resultado del proceso de evaluación de riesgos");
+            alert.setContentText(message);
+
+            // Show the alert and then offer to open a dialog with recent logs
+            alert.showAndWait();
+
+            // Logs are output via DBMS_OUTPUT in the database procedure; reload students table to reflect updates
+            loadStudents();
+
+        } catch (Exception e) {
+            logger.error("Error evaluating risks", e);
+            showAlert("Error", "No se pudo ejecutar la evaluación de riesgos: " + e.getMessage());
+        }
     }
 }

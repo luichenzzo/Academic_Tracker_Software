@@ -27,6 +27,7 @@ public class AcademicService {
     private final GrupoDAO grupoDAO;
     private final DocenteGrupoDAO docenteGrupoDAO;
     private final PeriodoAcademicoDAO periodoAcademicoDAO;
+    private final RiskDAO riskDAO = new RiskDAO();
 
     public AcademicService() {
         this.studentDAO = new StudentDAO();
@@ -599,5 +600,22 @@ public class AcademicService {
      */
     public Optional<PeriodoAcademico> getPeriodoById(String codPeriodo) throws SQLException {
         return periodoAcademicoDAO.findById(codPeriodo);
+    }
+
+    public RiskRunInfo evaluateRisks() throws SQLException {
+        RiskDAO.RiskRunResult res = riskDAO.evaluateRisks();
+        return new RiskRunInfo(res.runTimestamp, res.updatedCount, res.expelledCount);
+    }
+
+    public static class RiskRunInfo {
+        public final java.sql.Timestamp runTimestamp;
+        public final int updatedCount;
+        public final int expelledCount;
+
+        public RiskRunInfo(java.sql.Timestamp runTimestamp, int updatedCount, int expelledCount) {
+            this.runTimestamp = runTimestamp;
+            this.updatedCount = updatedCount;
+            this.expelledCount = expelledCount;
+        }
     }
 }
