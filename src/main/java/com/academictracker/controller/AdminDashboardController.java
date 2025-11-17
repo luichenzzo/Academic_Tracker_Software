@@ -13,14 +13,14 @@ import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.GridPane;
-import javafx.stage.Modality;
 import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.LocalDate;
-import java.util.List;
+import java.util.*;
 import java.util.Optional;
+import javafx.beans.property.SimpleObjectProperty;
 
 /**
  * Controller for Admin Dashboard
@@ -30,7 +30,15 @@ public class AdminDashboardController {
     
     @FXML private TabPane mainTabPane;
     @FXML private Label welcomeLabel;
-    
+
+    // Reports UI
+    @FXML private ComboBox<String> reportSelector;
+    @FXML private Button runReportButton;
+    @FXML private TableView<Map<String,Object>> reportTable;
+
+    // Mapping of display name -> DB view name
+    private final Map<String, String> reportViewMap = new LinkedHashMap<>();
+
     // Student Management
     @FXML private TableView<Student> studentTable;
     @FXML private TableColumn<Student, String> studentIdColumn;
@@ -131,8 +139,71 @@ public class AdminDashboardController {
         
         setupTables();
         loadData();
+
+        setupReports();
     }
-    
+
+    private void setupReports() {
+        // Populate mapping (display name -> view name). Keep same order as requirement list.
+        reportViewMap.put("1. Matrícula y carga por periodo", "vw_report_matricula_carga");
+        reportViewMap.put("2. Ocupación y top grupos", "vw_report_ocupacion_top_grupos");
+        reportViewMap.put("3. Intentos fallidos de matrícula", "vw_report_intentos_fallidos_matricula");
+        reportViewMap.put("4. Rendimiento por asignatura", "vw_report_rendimiento_asignatura");
+        reportViewMap.put("5. Distribución de notas", "vw_report_distribucion_notas");
+        reportViewMap.put("6. Evolución de promedio por estudiante", "vw_report_evolucion_promedio_estudiante");
+        reportViewMap.put("7. Riesgo académico por periodo", "vw_report_riesgo_academico_periodo");
+        reportViewMap.put("8. Intentos por asignatura", "vw_report_intentos_por_asignatura");
+        reportViewMap.put("9. Trayectoria por cohorte", "vw_report_trayectoria_cohorte");
+        reportViewMap.put("10. Mapa de prerrequisitos", "vw_report_mapa_prerrequisitos");
+        reportViewMap.put("11. Impacto de prerrequisitos", "vw_report_impacto_prerrequisitos");
+        reportViewMap.put("12. Reglas de evaluación incompletas", "vw_report_reglas_evaluacion_incompletas");
+        reportViewMap.put("13. Reprobación por ítem de evaluación", "vw_report_reprobacion_por_item");
+        reportViewMap.put("14. Avance en créditos vs plan", "vw_report_avance_creditos_vs_plan");
+        reportViewMap.put("15. Opinión estudiantil consolidada", "vw_report_opinion_consolidada");
+        reportViewMap.put("16. Cruce de opiniones y desempeño", "vw_report_cruce_opiniones_desempeno");
+        reportViewMap.put("17. Asignaturas 'cuello de botella'", "vw_report_cuello_botella");
+        reportViewMap.put("18. Calidad de datos", "vw_report_calidad_datos");
+
+        reportSelector.setItems(FXCollections.observableArrayList(reportViewMap.keySet()));
+        reportSelector.getSelectionModel().selectFirst();
+
+        // Attach button handler
+        runReportButton.setOnAction(evt -> handleRunReport());
+    }
+
+    @FXML
+    private void handleRunReport() {
+        String displayName = reportSelector.getSelectionModel().getSelectedItem();
+        if (displayName == null) return;
+        String viewName = reportViewMap.get(displayName);
+        try {
+            List<Map<String,Object>> rows = academicService.runReport(viewName);
+            populateReportTable(rows);
+        } catch (Exception e) {
+            logger.error("Error running report {}", viewName, e);
+            showAlert("Error", "Failed to run report: " + e.getMessage());
+        }
+    }
+
+    private void populateReportTable(List<Map<String,Object>> rows) {
+        reportTable.getItems().clear();
+        reportTable.getColumns().clear();
+        if (rows == null || rows.isEmpty()) return;
+
+        // Get column names from first row in insertion order
+        Map<String,Object> first = rows.get(0);
+        List<String> columns = new ArrayList<>(first.keySet());
+
+        for (String colName : columns) {
+            TableColumn<Map<String,Object>, Object> col = new TableColumn<>(colName);
+            col.setCellValueFactory(cellData -> new SimpleObjectProperty<>(cellData.getValue().get(colName)));
+            reportTable.getColumns().add(col);
+        }
+
+        ObservableList<Map<String,Object>> items = FXCollections.observableArrayList(rows);
+        reportTable.setItems(items);
+    }
+
     private void setupTables() {
         // Student table - updated to match the correct Student model fields
         studentIdColumn.setCellValueFactory(new PropertyValueFactory<>("codEstudiante"));

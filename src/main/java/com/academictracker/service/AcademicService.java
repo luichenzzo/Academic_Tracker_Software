@@ -3,12 +3,20 @@ package com.academictracker.service;
 import com.academictracker.dao.*;
 import com.academictracker.model.*;
 import com.academictracker.util.ValidationUtil;
+import com.academictracker.util.DatabaseConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.sql.Connection;
 import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -616,6 +624,36 @@ public class AcademicService {
             this.runTimestamp = runTimestamp;
             this.updatedCount = updatedCount;
             this.expelledCount = expelledCount;
+        }
+    }
+
+    /**
+     * Run a simple report by selecting all rows from a database view.
+     * Returns a list of rows where each row is a LinkedHashMap preserving column order.
+     */
+    public List<Map<String,Object>> runReport(String viewName) throws SQLException {
+        if (viewName == null || viewName.trim().isEmpty()) throw new IllegalArgumentException("viewName is required");
+        // Only allow simple identifier names (alphanumeric and underscores) to prevent SQL injection
+        if (!viewName.matches("[A-Za-z0-9_]+")) {
+            throw new IllegalArgumentException("Invalid view name");
+        }
+        String sql = "SELECT * FROM " + viewName;
+        try (Connection conn = DatabaseConnection.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            List<Map<String,Object>> rows = new ArrayList<>();
+            ResultSetMetaData md = rs.getMetaData();
+            int cols = md.getColumnCount();
+            while (rs.next()) {
+                Map<String,Object> row = new LinkedHashMap<>();
+                for (int i=1;i<=cols;i++) {
+                    String colName = md.getColumnLabel(i);
+                    Object val = rs.getObject(i);
+                    row.put(colName, val);
+                }
+                rows.add(row);
+            }
+            return rows;
         }
     }
 }

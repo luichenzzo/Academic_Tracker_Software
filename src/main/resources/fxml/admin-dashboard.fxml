@@ -221,6 +221,24 @@
                 </VBox>
             </Tab>
             
+            <!-- Reports Tab -->
+            <Tab text="Reports">
+                <VBox spacing="10" style="-fx-padding: 15;">
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="Select report:" />
+                        <ComboBox fx:id="reportSelector" prefWidth="500" />
+                        <Button fx:id="runReportButton" text="Run" styleClass="primary-button" />
+                    </HBox>
+
+                    <TableView fx:id="reportTable" VBox.vgrow="ALWAYS">
+                        <!-- Columns will be created dynamically in controller -->
+                        <placeholder>
+                            <Label text="Select a report and click Run to display results." style="-fx-text-fill: gray;"/>
+                        </placeholder>
+                    </TableView>
+                </VBox>
+            </Tab>
+
         </TabPane>
     </center>
     
