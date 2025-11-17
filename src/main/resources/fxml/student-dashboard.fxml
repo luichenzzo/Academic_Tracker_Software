@@ -132,6 +132,26 @@
                     </TableView>
                 </VBox>
             </Tab>
+
+            <!-- Tab: Feedback -->
+            <Tab text="Feedback">
+                <VBox spacing="10" style="-fx-padding: 15;">
+                    <Label text="Enviar feedback para una asignatura" style="-fx-font-size: 18px; -fx-font-weight: bold;"/>
+
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="Asignatura:" />
+                        <ComboBox fx:id="feedbackCourseComboBox" prefWidth="400" promptText="Selecciona una asignatura" />
+                    </HBox>
+
+                    <Label text="Comentario:" />
+                    <TextArea fx:id="feedbackTextArea" prefRowCount="6" wrapText="true" />
+
+                    <HBox spacing="10" alignment="CENTER_RIGHT">
+                        <Label fx:id="feedbackStatusLabel" text="" />
+                        <Button text="Enviar Feedback" fx:id="submitFeedbackButton" onAction="#handleSubmitFeedback" styleClass="btn-primary" />
+                    </HBox>
+                </VBox>
+            </Tab>
         </TabPane>
     </center>
 </BorderPane>

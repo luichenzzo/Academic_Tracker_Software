@@ -343,12 +343,44 @@ EXCEPTION
         -- Propagate unexpected errors with context
         RAISE_APPLICATION_ERROR(-20033, 'Error validando límite de créditos: ' || SQLERRM);
 END trg_limit_credits_by_risk;
-/
 
+-- =============================================
+-- TRIGGER 5: Verificar que un docente no exceda 16 horas semanales en el mismo periodo
+-- =============================================
+CREATE OR REPLACE TRIGGER trg_verificar_horas_docencia_semanal
+    BEFORE INSERT OR UPDATE ON DocenteGrupo
+    FOR EACH ROW
+DECLARE
+    v_cod_periodo      Grupo.cod_periodo%TYPE;
+    v_horas_existentes NUMBER := 0;
+    v_horas_nuevas     DocenteGrupo.horas_grupo%TYPE := :NEW.horas_grupo;
+BEGIN
+    -- Obtener el periodo del grupo al que se está vinculando
+    SELECT g.cod_periodo
+    INTO v_cod_periodo
+    FROM Grupo g
+    WHERE g.id_grupo = :NEW.id_grupo;
 
+    -- Sumar las horas ya asignadas al docente en ese periodo, excluyendo
+    -- el propio registro cuando se trata de un UPDATE
+    SELECT NVL(SUM(dg.horas_grupo), 0)
+    INTO v_horas_existentes
+    FROM DocenteGrupo dg
+    JOIN Grupo g2 ON dg.id_grupo = g2.id_grupo
+    WHERE dg.id_docente = :NEW.id_docente
+      AND g2.cod_periodo = v_cod_periodo
+      AND ( :NEW.id_docente_grupo IS NULL OR dg.id_docente_grupo != :NEW.id_docente_grupo );
 
+    -- Validar límite de 16 horas semanales
+    IF (v_horas_existentes + v_horas_nuevas) > 16 THEN
+        RAISE_APPLICATION_ERROR(-20040,
+            'Asignación inválida: el docente (id=' || :NEW.id_docente || ') excedería 16 horas semanales en el periodo ' || v_cod_periodo ||
+            '. Horas actuales: ' || v_horas_existentes || ', horas intentadas: ' || (v_horas_existentes + v_horas_nuevas));
+    END IF;
 
-
-
-
-
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RAISE_APPLICATION_ERROR(-20041, 'No se encontró el grupo para validar el periodo o datos incompletos.');
+    WHEN OTHERS THEN
+        RAISE_APPLICATION_ERROR(-20042, 'Error validando horas de docencia: ' || SQLERRM);
+END trg_verificar_horas_docencia_semanal;

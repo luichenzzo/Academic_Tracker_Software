@@ -2,6 +2,7 @@ package com.academictracker.controller;
 
 import com.academictracker.dao.*;
 import com.academictracker.model.*;
+import com.academictracker.service.FeedbackService;
 import com.academictracker.util.SessionManager;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -70,6 +71,12 @@ public class StudentDashboardController {
     @FXML private TableColumn<GradeDTO, String> colGradeEstado;
     @FXML private Label gradesStatusLabel;
 
+    // Feedback UI
+    @FXML private javafx.scene.control.ComboBox<String> feedbackCourseComboBox;
+    @FXML private javafx.scene.control.TextArea feedbackTextArea;
+    @FXML private javafx.scene.control.Button submitFeedbackButton;
+    @FXML private javafx.scene.control.Label feedbackStatusLabel;
+
     // DAOs
     private final StudentDAO studentDAO = new StudentDAO();
     private final MatriculaDAO matriculaDAO = new MatriculaDAO();
@@ -77,6 +84,7 @@ public class StudentDashboardController {
     private final GrupoDAO grupoDAO = new GrupoDAO();
     private final PeriodoAcademicoDAO periodoAcademicoDAO = new PeriodoAcademicoDAO();
     private final GradeDAO gradeDAO = new GradeDAO();
+    private final FeedbackService feedbackService = new FeedbackService();
 
     // Current student and enrollment data
     private Student currentStudent;
@@ -92,6 +100,71 @@ public class StudentDashboardController {
         loadGrades();
         loadAvailableGroups();
         setupTableSelectionListeners();
+        loadFeedbackCourses();
+    }
+
+    /**
+     * Carga las asignaturas disponibles para dejar feedback en el ComboBox.
+     * Prioriza las asignaturas en las que el estudiante está inscrito.
+     */
+    private void loadFeedbackCourses() {
+        try {
+            ObservableList<String> items = FXCollections.observableArrayList();
+
+            if (currentMatricula != null) {
+                List<DetalleMatricula> detalles = detalleMatriculaDAO.findByMatricula(currentMatricula.getIdMatricula());
+                for (DetalleMatricula d : detalles) {
+                    if (d.getGrupo() != null && d.getGrupo().getAsignatura() != null) {
+                        String display = d.getGrupo().getCodAsignatura() + " - " + d.getGrupo().getAsignatura().getNombre();
+                        if (!items.contains(display)) items.add(display);
+                    }
+                }
+            }
+
+            // Si no hay cursos inscritos, mostrar todas las asignaturas activas en grupos
+            if (items.isEmpty()) {
+                List<Grupo> grupos = grupoDAO.findAll();
+                for (Grupo g : grupos) {
+                    if (g.getAsignatura() != null) {
+                        String display = g.getCodAsignatura() + " - " + g.getAsignatura().getNombre();
+                        if (!items.contains(display)) items.add(display);
+                    }
+                }
+            }
+
+            feedbackCourseComboBox.setItems(items);
+            if (!items.isEmpty()) feedbackCourseComboBox.setValue(items.get(0));
+        } catch (Exception e) {
+            logger.error("Error loading feedback courses", e);
+        }
+    }
+
+    @FXML
+    private void handleSubmitFeedback() {
+        String selected = feedbackCourseComboBox.getValue();
+        String comment = feedbackTextArea.getText();
+
+        if (selected == null || selected.trim().isEmpty()) {
+            showWarning("Advertencia", "Por favor seleccione una asignatura para enviar feedback");
+            return;
+        }
+
+        if (comment == null || comment.trim().isEmpty()) {
+            showWarning("Advertencia", "Por favor escribe un comentario antes de enviar");
+            return;
+        }
+
+        try {
+            feedbackService.submitCourseFeedback(selected, comment);
+            feedbackStatusLabel.setText("Feedback enviado");
+            feedbackStatusLabel.setStyle("-fx-text-fill: green;");
+            feedbackTextArea.clear();
+        } catch (Exception e) {
+            logger.error("Error submitting feedback", e);
+            feedbackStatusLabel.setText("Error al enviar feedback");
+            feedbackStatusLabel.setStyle("-fx-text-fill: red;");
+            showError("Error", "No se pudo enviar el feedback: " + e.getMessage());
+        }
     }
 
     /**
@@ -652,6 +725,7 @@ public class StudentDashboardController {
         loadAvailableGroups();
         enrollmentMessageLabel.setText("");
         loadGrades();
+        loadFeedbackCourses();
     }
 
     @FXML

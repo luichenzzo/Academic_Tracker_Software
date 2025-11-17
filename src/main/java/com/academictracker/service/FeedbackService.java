@@ -73,6 +73,24 @@ public class FeedbackService {
     }
     
     /**
+     * Submit simple course feedback that only stores the subject and the comment
+     */
+    public void submitCourseFeedback(String subject, String message) {
+        try {
+            Document feedback = new Document()
+                .append("subject", subject)
+                .append("message", message)
+                .append("timestamp", LocalDateTime.now().toString());
+
+            feedbackCollection.insertOne(feedback);
+            logger.info("Course feedback submitted for subject: {}", subject);
+        } catch (Exception e) {
+            logger.error("Error submitting course feedback: " + e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    /**
      * Get all feedback
      */
     public List<Document> getAllFeedback() {
