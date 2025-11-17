@@ -154,6 +154,7 @@ END;
 -- TRIGGER 3: Actualizar nota definitiva automáticamente
 -- =============================================
 -- Package to hold collection of id_detalle affected by DML on Calificacion
+
 CREATE OR REPLACE PACKAGE pkg_trg_nota AS
     TYPE t_id_set IS TABLE OF PLS_INTEGER INDEX BY PLS_INTEGER;
     g_id_set t_id_set;
@@ -161,8 +162,6 @@ CREATE OR REPLACE PACKAGE pkg_trg_nota AS
     PROCEDURE add_det(p_det IN PLS_INTEGER);
     PROCEDURE process_and_clear;
 END pkg_trg_nota;
-/
-
 CREATE OR REPLACE PACKAGE BODY pkg_trg_nota AS
     PROCEDURE add_det(p_det IN PLS_INTEGER) IS
     BEGIN
@@ -232,8 +231,6 @@ CREATE OR REPLACE PACKAGE BODY pkg_trg_nota AS
         g_id_set := t_id_set();
     END process_and_clear;
 END pkg_trg_nota;
-/
-
 -- Row-level trigger: collect affected id_detalle values into package collection
 CREATE OR REPLACE TRIGGER trg_actualizar_nota_detalle_row
     AFTER INSERT OR UPDATE OR DELETE ON Calificacion
@@ -245,16 +242,12 @@ BEGIN
         pkg_trg_nota.add_det(:OLD.id_detalle);
     END IF;
 END trg_actualizar_nota_detalle_row;
-/
-
 -- Statement-level trigger: process collected ids and update NotaDefinitiva
 CREATE OR REPLACE TRIGGER trg_actualizar_nota_detalle_stmt
     AFTER INSERT OR UPDATE OR DELETE ON Calificacion
 BEGIN
     pkg_trg_nota.process_and_clear;
 END trg_actualizar_nota_detalle_stmt;
-/
-
 -- Prevent modifications to Calificacion if NotaDefinitiva is closed (cerrada = 1)
 CREATE OR REPLACE TRIGGER trg_prevent_modify_when_closed
     BEFORE INSERT OR UPDATE OR DELETE ON Calificacion
